@@ -12,6 +12,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 public abstract class IntegrationTestSupport {
 
     @Container
+    @SuppressWarnings("resource")
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
             .withDatabaseName("liveklass_test")
             .withUsername("liveklass")
