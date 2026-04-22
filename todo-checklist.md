@@ -4,13 +4,14 @@ Simple checklist for building the BE-A take-home without overcomplicating it.
 
 Main goal: finish the required flow cleanly, make concurrency safe, and leave a repo that is easy to review.
 
-## 0. Current review snapshot (2026-04-22)
+## 0. Current review snapshot (2026-04-23)
 
-- [x] Spring Boot starter scaffold exists
-- [x] BE-A implementation has not started yet beyond the default application class and placeholder test
-- [x] `./mvnw test` currently fails because no datasource is configured for the application context
+- [x] Spring Boot application, Flyway migration, entities, enums, and repositories exist
+- [x] BE-A HTTP and service flows have not started yet; there are still no controllers, services, transactions, or API error handlers
+- [x] `./mvnw test` passes with Testcontainers PostgreSQL and Flyway
 - [x] README is still a placeholder (still needs full content)
-- [x] Docker Compose added at `docker/postgres-compose.yml`
+- [x] Docker Compose exists at `docker/postgres-compose.yml`
+- [x] Local `./mvnw spring-boot:run` starts cleanly against a fresh compose database; the earlier Flyway checksum mismatch was caused by stale local schema history
 
 ## 1. Project setup
 
@@ -19,19 +20,19 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [x] Replace scaffold defaults: `artifactId`, app name, and `DemoApplication` naming
 - [x] Set up PostgreSQL with Docker Compose
 - [x] Configure datasource settings for local run and tests (`application.yml`)
-- [x] Confirm the app starts and connects to the database
+- [x] Confirm the app starts and connects to the local compose database from a clean or repaired state
 - [x] Make the base test suite pass before starting feature work
 - [ ] Decide and document the lightweight auth approach: `userId` and role via header or request parameter
 - [x] Keep the package structure small: controller / service / repository / entity / dto
 
 ## 2. Database and schema
 
-- [ ] Create `course` table
-- [ ] Create `enrollment` table
-- [ ] Add index on `enrollment(course_id, status)`
-- [ ] Add index on `enrollment(student_id, requested_at)`
-- [ ] Add unique partial index for one active enrollment per student per course
-- [ ] Store enum values as strings, not ordinals
+- [x] Create `course` table
+- [x] Create `enrollment` table
+- [x] Add index on `enrollment(course_id, status)`
+- [x] Add index on `enrollment(student_id, requested_at)`
+- [x] Add unique partial index for one active enrollment per student per course
+- [x] Store enum values as strings, not ordinals
 
 ## 3. Course flow
 
@@ -151,17 +152,22 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Explain that payment is simplified as a status change
 - [ ] Document the mapping between API naming (`classes`) and domain naming (`course`)
 
-## 11. Scope control
+## 11. POST MVP
+
+- [ ] Restrict enrollment cancellation to an allowed window after payment, for example within 7 days
+- [ ] Add waitlist support
+- [ ] Add per-course enrolled student list for the creator
+- [ ] Add pagination for enrollment history
+
+## 12. Scope control
 
 - [ ] Do not spend time on optional items until all required APIs, tests, and docs are complete
-- [ ] Treat cancellation-period restriction and creator-only student list as optional extras
-- [ ] Do not add waitlist
-- [ ] Do not add pagination unless everything required is already done
+- [ ] Keep POST MVP items out of the core delivery scope until all required APIs, tests, and docs are complete
 - [ ] Do not add Redis, queues, or extra infrastructure
 - [ ] Do not add Spring Security for this take-home
 - [ ] Keep the solution boring and reliable
 
-## 12. Final check before submission
+## 13. Final check before submission
 
 - [ ] Start from a clean database and run the app again
 - [ ] Run the test suite from a clean state
