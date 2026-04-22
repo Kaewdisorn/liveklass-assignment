@@ -4,14 +4,25 @@ Simple checklist for building the BE-A take-home without overcomplicating it.
 
 Main goal: finish the required flow cleanly, make concurrency safe, and leave a repo that is easy to review.
 
+## 0. Current review snapshot (2026-04-22)
+
+- [x] Spring Boot starter scaffold exists
+- [x] BE-A implementation has not started yet beyond the default application class and placeholder test
+- [x] `./mvnw test` currently fails because no datasource is configured for the application context
+- [x] README is still a placeholder (still needs full content)
+- [x] Docker Compose added at `docker/postgres-compose.yml`
+
 ## 1. Project setup
 
-- [ ] Create Spring Boot project with Java 21
-- [ ] Add only the required dependencies: Web, Validation, JPA, PostgreSQL
-- [ ] Set up PostgreSQL with Docker Compose
-- [ ] Confirm the app starts and connects to the database
+- [x] Create Spring Boot project with Java 21
+- [x] Add the required runtime dependencies: Web, Validation, JPA, PostgreSQL
+- [x] Replace scaffold defaults: `artifactId`, app name, and `DemoApplication` naming
+- [x] Set up PostgreSQL with Docker Compose
+- [x] Configure datasource settings for local run and tests (`application.yml`)
+- [x] Confirm the app starts and connects to the database
+- [x] Make the base test suite pass before starting feature work
 - [ ] Decide and document the lightweight auth approach: `userId` and role via header or request parameter
-- [ ] Keep the package structure small: controller / service / repository / entity / dto
+- [x] Keep the package structure small: controller / service / repository / entity / dto
 
 ## 2. Database and schema
 
@@ -89,6 +100,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 
 ## 7. Tests
 
+- [ ] Replace the placeholder `contextLoads` test with BE-A integration tests once datasource setup is in place
 - [ ] Test course creation success
 - [ ] Test invalid course status transition
 - [ ] Test enrollment rejected for `DRAFT` or `CLOSED`
@@ -104,6 +116,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 
 ## 8. README
 
+- [ ] Replace the placeholder README with the required assignment sections
 - [ ] Add project overview
 - [ ] Add tech stack
 - [ ] Add local run instructions
