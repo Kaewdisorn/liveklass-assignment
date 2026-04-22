@@ -17,3 +17,20 @@ CREATE TABLE course (
         status IN ('DRAFT', 'OPEN', 'CLOSED')
     )
 );
+
+CREATE TABLE enrollment (
+    id BIGSERIAL PRIMARY KEY,
+    course_id BIGINT NOT NULL,
+    student_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_enrollment_course FOREIGN KEY (course_id) REFERENCES course (id) ON DELETE RESTRICT,
+    CONSTRAINT ck_enrollment_status CHECK (
+        status IN (
+            'PENDING',
+            'CONFIRMED',
+            'CANCELLED'
+        )
+    )
+);
