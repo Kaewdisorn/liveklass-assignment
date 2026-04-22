@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: liveklass-assignment
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/liveklass}
+    username: ${DB_USERNAME:liveklass}
+    password: ${DB_PASSWORD:liveklass}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    org.hibernate.SQL: debug

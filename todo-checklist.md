@@ -4,13 +4,25 @@ Simple checklist for building the BE-A take-home without overcomplicating it.
 
 Main goal: finish the required flow cleanly, make concurrency safe, and leave a repo that is easy to review.
 
+## 0. Current review snapshot (2026-04-22)
+
+- [x] Spring Boot starter scaffold exists
+- [x] BE-A implementation has not started yet beyond the default application class and placeholder test
+- [x] `./mvnw test` currently fails because no datasource is configured for the application context
+- [x] README is still a placeholder (still needs full content)
+- [x] Docker Compose added at `docker/postgres-compose.yml`
+
 ## 1. Project setup
 
-- [ ] Create Spring Boot project with Java 21
-- [ ] Add only the required dependencies: Web, Validation, JPA, PostgreSQL
-- [ ] Set up PostgreSQL with Docker Compose
-- [ ] Confirm the app starts and connects to the database
-- [ ] Keep the package structure small: controller / service / repository / entity / dto
+- [x] Create Spring Boot project with Java 21
+- [x] Add the required runtime dependencies: Web, Validation, JPA, PostgreSQL
+- [x] Replace scaffold defaults: `artifactId`, app name, and `DemoApplication` naming
+- [x] Set up PostgreSQL with Docker Compose
+- [x] Configure datasource settings for local run and tests (`application.yml`)
+- [x] Confirm the app starts and connects to the database
+- [x] Make the base test suite pass before starting feature work
+- [ ] Decide and document the lightweight auth approach: `userId` and role via header or request parameter
+- [x] Keep the package structure small: controller / service / repository / entity / dto
 
 ## 2. Database and schema
 
@@ -24,6 +36,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 ## 3. Course flow
 
 - [ ] Implement course create API
+- [ ] Validate course create request fields: title, description, price, capacity, start date, end date
 - [ ] Implement course status change API
 - [ ] Implement course list API with optional `status` filter
 - [ ] Implement course detail API
@@ -31,6 +44,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Allow only `CREATOR` to create courses and change course status
 - [ ] Enforce `DRAFT -> OPEN -> CLOSED` only
 - [ ] Reject all other transitions explicitly
+- [ ] Keep naming consistent between API, DTO, and domain, or document the mapping clearly
 
 ## 4. Enrollment flow
 
@@ -38,6 +52,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Implement enrollment confirm API
 - [ ] Implement enrollment cancel API
 - [ ] Implement my enrollments API
+- [ ] Keep payment confirmation simplified as an internal status change, without external payment integration
 - [ ] Start every new enrollment as `PENDING`
 - [ ] Treat `PENDING` and `CONFIRMED` as active enrollments
 - [ ] Use the same active-enrollment definition everywhere: `PENDING + CONFIRMED`
@@ -58,6 +73,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Assume PostgreSQL default isolation level (`READ COMMITTED`)
 - [ ] Rely on row-level locking for correctness under that isolation level
 - [ ] Rely on the course row lock for capacity consistency, and the DB unique constraint for duplicate protection
+- [ ] Consider lock wait timeout behavior so enrollment requests do not block forever
 - [ ] Count active enrollments inside the locked transaction
 - [ ] Ensure the count query explicitly filters only active statuses: `PENDING`, `CONFIRMED`
 - [ ] Reject enrollment when active count has reached capacity
@@ -74,14 +90,17 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 
 - [ ] Add one `@RestControllerAdvice`
 - [ ] Define small, clear error codes
+- [ ] Keep response structure consistent across success and error cases
 - [ ] Use `COURSE_NOT_OPEN` for both `DRAFT` and `CLOSED`
 - [ ] Return consistent errors for invalid state transitions
 - [ ] Return `FORBIDDEN` for role or ownership failures
 - [ ] Return `NOT_FOUND` for missing course or enrollment
 - [ ] Map database exceptions such as `DataIntegrityViolationException` to business errors
+- [ ] Avoid returning JPA entities directly from controllers
 
 ## 7. Tests
 
+- [ ] Replace the placeholder `contextLoads` test with BE-A integration tests once datasource setup is in place
 - [ ] Test course creation success
 - [ ] Test invalid course status transition
 - [ ] Test enrollment rejected for `DRAFT` or `CLOSED`
@@ -92,25 +111,36 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Test same-student double submit: only one active enrollment is created
 - [ ] Test confirm vs cancel race on the same enrollment: only one state change succeeds
 - [ ] Use real multi-threaded execution to simulate concurrency
+- [ ] Use a latch or barrier to align concurrent start timing in race-condition tests
 - [ ] Keep test focus on integration tests, not a big controller test suite
 
 ## 8. README
 
+- [ ] Replace the placeholder README with the required assignment sections
 - [ ] Add project overview
 - [ ] Add tech stack
 - [ ] Add local run instructions
+- [ ] Add Docker-based run instructions for the database dependency
 - [ ] Add test run instructions
-- [ ] Add API examples
+- [ ] Add requirement interpretation and assumptions
+- [ ] Add API list and sample requests/responses
 - [ ] Add a short Concurrency Design Summary
 - [ ] Include one concrete race scenario example
-- [ ] Add data model summary
-- [ ] Add assumptions
-- [ ] Add design decisions
+- [ ] Add data model description plus DB schema or ERD explanation
+- [ ] Add design decisions and reasons
 - [ ] Add trade-offs
 - [ ] Add AI usage scope
-- [ ] Add unimplemented items
+- [ ] Add unimplemented items and constraints
 
-## 9. Important notes to explain in README
+## 9. Product-level edge cases
+
+- [ ] Check the same user retrying enrollment rapidly because of network retries
+- [ ] Check the same payment confirmation request being sent twice
+- [ ] Check cancelling after confirmation
+- [ ] Check enrollment while the course is being closed
+- [ ] Add minimal logging for enrollment success and failure paths
+
+## 10. Important notes to explain in README
 
 - [ ] Explain that `PENDING` reserves a seat
 - [ ] Explain why pessimistic locking was chosen
@@ -121,19 +151,22 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Explain that payment is simplified as a status change
 - [ ] Document the mapping between API naming (`classes`) and domain naming (`course`)
 
-## 10. Scope control
+## 11. Scope control
 
+- [ ] Do not spend time on optional items until all required APIs, tests, and docs are complete
+- [ ] Treat cancellation-period restriction and creator-only student list as optional extras
 - [ ] Do not add waitlist
 - [ ] Do not add pagination unless everything required is already done
 - [ ] Do not add Redis, queues, or extra infrastructure
 - [ ] Do not add Spring Security for this take-home
 - [ ] Keep the solution boring and reliable
 
-## 11. Final check before submission
+## 12. Final check before submission
 
 - [ ] Start from a clean database and run the app again
 - [ ] Run the test suite from a clean state
 - [ ] Verify all required APIs work end to end
 - [ ] Verify no unexpected lazy loading or N+1 query behavior in course detail
 - [ ] Re-read README once as if I were the reviewer
+- [ ] Verify the repository has readable commit history and is ready to submit as a public URL
 - [ ] Make sure the repository is public and runnable on `main`
