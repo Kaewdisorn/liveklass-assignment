@@ -34,3 +34,13 @@ CREATE TABLE enrollment (
         )
     )
 );
+
+CREATE INDEX idx_enrollment_course_id_status
+    ON enrollment (course_id, status);
+
+CREATE INDEX idx_enrollment_student_id_requested_at
+    ON enrollment (student_id, requested_at DESC);
+
+CREATE UNIQUE INDEX uq_enrollment_active_per_student_course
+    ON enrollment (course_id, student_id)
+    WHERE status IN ('PENDING', 'CONFIRMED');
