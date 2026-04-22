@@ -31,6 +31,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Allow only `CREATOR` to create courses and change course status
 - [ ] Enforce `DRAFT -> OPEN -> CLOSED` only
 - [ ] Reject all other transitions explicitly
+- [ ] Keep naming consistent between API, DTO, and domain, or document the mapping clearly
 
 ## 4. Enrollment flow
 
@@ -58,6 +59,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Assume PostgreSQL default isolation level (`READ COMMITTED`)
 - [ ] Rely on row-level locking for correctness under that isolation level
 - [ ] Rely on the course row lock for capacity consistency, and the DB unique constraint for duplicate protection
+- [ ] Consider lock wait timeout behavior so enrollment requests do not block forever
 - [ ] Count active enrollments inside the locked transaction
 - [ ] Ensure the count query explicitly filters only active statuses: `PENDING`, `CONFIRMED`
 - [ ] Reject enrollment when active count has reached capacity
@@ -74,11 +76,13 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 
 - [ ] Add one `@RestControllerAdvice`
 - [ ] Define small, clear error codes
+- [ ] Keep response structure consistent across success and error cases
 - [ ] Use `COURSE_NOT_OPEN` for both `DRAFT` and `CLOSED`
 - [ ] Return consistent errors for invalid state transitions
 - [ ] Return `FORBIDDEN` for role or ownership failures
 - [ ] Return `NOT_FOUND` for missing course or enrollment
 - [ ] Map database exceptions such as `DataIntegrityViolationException` to business errors
+- [ ] Avoid returning JPA entities directly from controllers
 
 ## 7. Tests
 
@@ -92,6 +96,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Test same-student double submit: only one active enrollment is created
 - [ ] Test confirm vs cancel race on the same enrollment: only one state change succeeds
 - [ ] Use real multi-threaded execution to simulate concurrency
+- [ ] Use a latch or barrier to align concurrent start timing in race-condition tests
 - [ ] Keep test focus on integration tests, not a big controller test suite
 
 ## 8. README
@@ -110,7 +115,15 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Add AI usage scope
 - [ ] Add unimplemented items
 
-## 9. Important notes to explain in README
+## 9. Product-level edge cases
+
+- [ ] Check the same user retrying enrollment rapidly because of network retries
+- [ ] Check the same payment confirmation request being sent twice
+- [ ] Check cancelling after confirmation
+- [ ] Check enrollment while the course is being closed
+- [ ] Add minimal logging for enrollment success and failure paths
+
+## 10. Important notes to explain in README
 
 - [ ] Explain that `PENDING` reserves a seat
 - [ ] Explain why pessimistic locking was chosen
@@ -121,7 +134,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Explain that payment is simplified as a status change
 - [ ] Document the mapping between API naming (`classes`) and domain naming (`course`)
 
-## 10. Scope control
+## 11. Scope control
 
 - [ ] Do not add waitlist
 - [ ] Do not add pagination unless everything required is already done
@@ -129,7 +142,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Do not add Spring Security for this take-home
 - [ ] Keep the solution boring and reliable
 
-## 11. Final check before submission
+## 12. Final check before submission
 
 - [ ] Start from a clean database and run the app again
 - [ ] Run the test suite from a clean state
