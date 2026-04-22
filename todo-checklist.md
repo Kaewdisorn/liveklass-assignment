@@ -151,17 +151,22 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Explain that payment is simplified as a status change
 - [ ] Document the mapping between API naming (`classes`) and domain naming (`course`)
 
-## 11. Scope control
+## 11. POST MVP
+
+- [ ] Restrict enrollment cancellation to an allowed window after payment, for example within 7 days
+- [ ] Add waitlist support
+- [ ] Add per-course enrolled student list for the creator
+- [ ] Add pagination for enrollment history
+
+## 12. Scope control
 
 - [ ] Do not spend time on optional items until all required APIs, tests, and docs are complete
-- [ ] Treat cancellation-period restriction and creator-only student list as optional extras
-- [ ] Do not add waitlist
-- [ ] Do not add pagination unless everything required is already done
+- [ ] Keep POST MVP items out of the core delivery scope until all required APIs, tests, and docs are complete
 - [ ] Do not add Redis, queues, or extra infrastructure
 - [ ] Do not add Spring Security for this take-home
 - [ ] Keep the solution boring and reliable
 
-## 12. Final check before submission
+## 13. Final check before submission
 
 - [ ] Start from a clean database and run the app again
 - [ ] Run the test suite from a clean state
