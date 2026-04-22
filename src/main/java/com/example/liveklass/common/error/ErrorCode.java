@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
     BAD_REQUEST(HttpStatus.BAD_REQUEST, "Invalid request."),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Unauthorized access."),
     COURSE_NOT_OPEN(HttpStatus.CONFLICT, "Course is not open for enrollment."),
     COURSE_FULL(HttpStatus.CONFLICT, "Course capacity has been reached."),
     DUPLICATE_ENROLLMENT(HttpStatus.CONFLICT, "Active enrollment already exists."),
