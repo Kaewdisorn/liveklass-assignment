@@ -10,6 +10,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Add only the required dependencies: Web, Validation, JPA, PostgreSQL
 - [ ] Set up PostgreSQL with Docker Compose
 - [ ] Confirm the app starts and connects to the database
+- [ ] Decide and document the lightweight auth approach: `userId` and role via header or request parameter
 - [ ] Keep the package structure small: controller / service / repository / entity / dto
 
 ## 2. Database and schema
@@ -24,6 +25,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 ## 3. Course flow
 
 - [ ] Implement course create API
+- [ ] Validate course create request fields: title, description, price, capacity, start date, end date
 - [ ] Implement course status change API
 - [ ] Implement course list API with optional `status` filter
 - [ ] Implement course detail API
@@ -39,6 +41,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Implement enrollment confirm API
 - [ ] Implement enrollment cancel API
 - [ ] Implement my enrollments API
+- [ ] Keep payment confirmation simplified as an internal status change, without external payment integration
 - [ ] Start every new enrollment as `PENDING`
 - [ ] Treat `PENDING` and `CONFIRMED` as active enrollments
 - [ ] Use the same active-enrollment definition everywhere: `PENDING + CONFIRMED`
@@ -104,16 +107,17 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Add project overview
 - [ ] Add tech stack
 - [ ] Add local run instructions
+- [ ] Add Docker-based run instructions for the database dependency
 - [ ] Add test run instructions
-- [ ] Add API examples
+- [ ] Add requirement interpretation and assumptions
+- [ ] Add API list and sample requests/responses
 - [ ] Add a short Concurrency Design Summary
 - [ ] Include one concrete race scenario example
-- [ ] Add data model summary
-- [ ] Add assumptions
-- [ ] Add design decisions
+- [ ] Add data model description plus DB schema or ERD explanation
+- [ ] Add design decisions and reasons
 - [ ] Add trade-offs
 - [ ] Add AI usage scope
-- [ ] Add unimplemented items
+- [ ] Add unimplemented items and constraints
 
 ## 9. Product-level edge cases
 
@@ -136,6 +140,8 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 
 ## 11. Scope control
 
+- [ ] Do not spend time on optional items until all required APIs, tests, and docs are complete
+- [ ] Treat cancellation-period restriction and creator-only student list as optional extras
 - [ ] Do not add waitlist
 - [ ] Do not add pagination unless everything required is already done
 - [ ] Do not add Redis, queues, or extra infrastructure
@@ -149,4 +155,5 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Verify all required APIs work end to end
 - [ ] Verify no unexpected lazy loading or N+1 query behavior in course detail
 - [ ] Re-read README once as if I were the reviewer
+- [ ] Verify the repository has readable commit history and is ready to submit as a public URL
 - [ ] Make sure the repository is public and runnable on `main`
