@@ -25,4 +25,20 @@ public class GlobalExceptionHandler {
                         request.getRequestURI()));
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationException(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request) {
+        String message = exception.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(FieldError::getDefaultMessage)
+                .collect(Collectors.joining(", "));
+
+        return ResponseEntity
+                .status(ErrorCode.BAD_REQUEST.getHttpStatus())
+                .body(ErrorResponse.of(ErrorCode.BAD_REQUEST, message,
+                        request.getRequestURI()));
+    }
+
 }
