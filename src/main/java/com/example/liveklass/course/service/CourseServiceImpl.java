@@ -50,6 +50,15 @@ public class CourseServiceImpl implements CourseService {
         return toDetailResponse(savedCourse, 0L);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public CourseDetailResponse getCourse(Long courseId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
+
+        return toDetailResponse(course, 0L);
+    }
+
     private void assertCreator(RequestUser requestUser) {
         if (requestUser.role() != UserRole.CREATOR) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Creator role is required.");
