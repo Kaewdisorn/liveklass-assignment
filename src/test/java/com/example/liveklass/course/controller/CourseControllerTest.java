@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -22,6 +22,7 @@ import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.service.CourseService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -104,7 +105,14 @@ class CourseControllerTest {
                     .andExpect(jsonPath("$.creatorId").value(123))
                     .andExpect(jsonPath("$.status").value("DRAFT"));
 
-            verify(courseService, times(1)).createCourse(any(RequestUser.class), any(CreateCourseRequest.class));
+            ArgumentCaptor<RequestUser> userCaptor = ArgumentCaptor.forClass(RequestUser.class);
+            ArgumentCaptor<CreateCourseRequest> requestCaptor = ArgumentCaptor.forClass(CreateCourseRequest.class);
+
+            verify(courseService).createCourse(userCaptor.capture(), requestCaptor.capture());
+
+            assertThat(userCaptor.getValue().userId()).isEqualTo(123L);
+            assertThat(userCaptor.getValue().role().name()).isEqualTo("CREATOR");
+            assertThat(requestCaptor.getValue().title()).isEqualTo("Math 101");
         }
     }
 
