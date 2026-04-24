@@ -7,4 +7,6 @@ import com.example.liveklass.course.dto.CreateCourseRequest;
 public interface CourseService {
     CourseDetailResponse createCourse(RequestUser requestUser, CreateCourseRequest request);
 
+    CourseDetailResponse getCourse(Long courseId);
+
 }

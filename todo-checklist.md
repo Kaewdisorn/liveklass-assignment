@@ -1,28 +1,32 @@
 # Working Checklist
 
-Simple checklist for building the BE-A take-home without overcomplicating it.
+Simple checklist for finishing the BE-A take-home without losing track of what is already done versus what is only scaffolded.
 
-Main goal: finish the required flow cleanly, make concurrency safe, and leave a repo that is easy to review.
+Main goal: complete the required APIs, make enrollment concurrency safe, and leave a repo that is easy to review.
 
 ## 0. Current review snapshot (2026-04-23)
 
-- [x] Spring Boot application, Flyway migration, entities, enums, and repositories exist
-- [x] BE-A HTTP and service flows have not started yet; there are still no controllers, services, transactions, or API error handlers
+- [x] Spring Boot app, Flyway migration, entities, enums, and baseline repositories exist
+- [x] Lightweight auth is decided and implemented with `X-User-Id` and `X-User-Role`
+- [x] Shared error model exists and business plus validation handlers are active
+- [x] Course creation scaffolding exists across DTO, controller, service, and persistence
 - [x] `./mvnw test` passes with Testcontainers PostgreSQL and Flyway
-- [x] README is still a placeholder (still needs full content)
 - [x] Docker Compose exists at `docker/postgres-compose.yml`
-- [x] Local `./mvnw spring-boot:run` starts cleanly against a fresh compose database; the earlier Flyway checksum mismatch was caused by stale local schema history
+- [ ] `GlobalExceptionHandler` still has commented-out DB-integrity and catch-all handlers
+- [ ] Course API is still incomplete: create returns `200 OK`, `/classes/test` is still present, and detail/list/status-change endpoints do not exist
+- [ ] Enrollment service and controller layers do not exist yet
+- [ ] README is still a placeholder
+- [ ] Test coverage is still smoke-only: `LiveklassApplicationTests` still contains only `contextLoads`
 
 ## 1. Project setup
 
 - [x] Create Spring Boot project with Java 21
 - [x] Add the required runtime dependencies: Web, Validation, JPA, PostgreSQL
-- [x] Replace scaffold defaults: `artifactId`, app name, and `DemoApplication` naming
+- [x] Replace scaffold defaults: `artifactId`, app name, and application naming
 - [x] Set up PostgreSQL with Docker Compose
 - [x] Configure datasource settings for local run and tests (`application.yml`)
-- [x] Confirm the app starts and connects to the local compose database from a clean or repaired state
-- [x] Make the base test suite pass before starting feature work
-- [ ] Decide and document the lightweight auth approach: `userId` and role via header or request parameter
+- [x] Confirm the app starts and the smoke test suite passes
+- [x] Decide and implement the lightweight auth approach with request headers
 - [x] Keep the package structure small: controller / service / repository / entity / dto
 
 ## 2. Database and schema
@@ -36,13 +40,17 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 
 ## 3. Course flow
 
-- [ ] Implement course create API
-- [ ] Validate course create request fields: title, description, price, capacity, start date, end date
+- [x] Implement course create API scaffold
+- [x] Validate course create request fields: title, description, price, capacity, start date, end date
+- [x] Allow only `CREATOR` to create courses
+- [x] Save new courses with initial `DRAFT` status
+- [ ] Return `201 Created` and `Location` header from course create API
+- [ ] Remove temporary `/classes/test` endpoint
 - [ ] Implement course status change API
 - [ ] Implement course list API with optional `status` filter
 - [ ] Implement course detail API
 - [ ] Return current active enrollment count from course detail
-- [ ] Allow only `CREATOR` to create courses and change course status
+- [ ] Allow only `CREATOR` to change course status
 - [ ] Enforce `DRAFT -> OPEN -> CLOSED` only
 - [ ] Reject all other transitions explicitly
 - [ ] Keep naming consistent between API, DTO, and domain, or document the mapping clearly
@@ -53,6 +61,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Implement enrollment confirm API
 - [ ] Implement enrollment cancel API
 - [ ] Implement my enrollments API
+- [ ] Add enrollment request/response DTOs
 - [ ] Keep payment confirmation simplified as an internal status change, without external payment integration
 - [ ] Start every new enrollment as `PENDING`
 - [ ] Treat `PENDING` and `CONFIRMED` as active enrollments
@@ -85,23 +94,28 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Load enrollment with `PESSIMISTIC_WRITE` for confirm and cancel
 - [ ] Ensure only one state transition can succeed per enrollment under concurrent requests
 - [ ] Convert unique-constraint violations to `DUPLICATE_ENROLLMENT`
-- [ ] Treat the service-level duplicate check as a fast-fail optimization; the database constraint is the final source of truth
+- [ ] Treat the service-level duplicate check as a fast-fail optimization; the database is the final source of truth
 
 ## 6. Error handling
 
-- [ ] Add one `@RestControllerAdvice`
-- [ ] Define small, clear error codes
-- [ ] Keep response structure consistent across success and error cases
+- [x] Add one `@RestControllerAdvice`
+- [x] Define small, clear error codes
+- [x] Keep error response structure consistent with `ErrorResponse`
+- [x] Reject missing or invalid auth headers with `UNAUTHORIZED`
+- [ ] Enable `DataIntegrityViolationException` mapping
+- [ ] Add catch-all unexpected exception mapping
 - [ ] Use `COURSE_NOT_OPEN` for both `DRAFT` and `CLOSED`
 - [ ] Return consistent errors for invalid state transitions
 - [ ] Return `FORBIDDEN` for role or ownership failures
 - [ ] Return `NOT_FOUND` for missing course or enrollment
-- [ ] Map database exceptions such as `DataIntegrityViolationException` to business errors
+- [ ] Map database exceptions such as `DataIntegrityViolationException` to business errors where needed
 - [ ] Avoid returning JPA entities directly from controllers
 
 ## 7. Tests
 
-- [ ] Replace the placeholder `contextLoads` test with BE-A integration tests once datasource setup is in place
+- [x] Keep Testcontainers PostgreSQL integration support in place
+- [x] Keep the current smoke test passing
+- [ ] Replace the placeholder `contextLoads` test with BE-A integration tests
 - [ ] Test course creation success
 - [ ] Test invalid course status transition
 - [ ] Test enrollment rejected for `DRAFT` or `CLOSED`
@@ -125,7 +139,7 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 - [ ] Add test run instructions
 - [ ] Add requirement interpretation and assumptions
 - [ ] Add API list and sample requests/responses
-- [ ] Add a short Concurrency Design Summary
+- [ ] Add a short concurrency design summary
 - [ ] Include one concrete race scenario example
 - [ ] Add data model description plus DB schema or ERD explanation
 - [ ] Add design decisions and reasons
@@ -161,11 +175,11 @@ Main goal: finish the required flow cleanly, make concurrency safe, and leave a 
 
 ## 12. Scope control
 
+- [x] Do not add Redis, queues, or extra infrastructure
+- [x] Do not add Spring Security for this take-home
+- [x] Keep the solution boring and reliable
 - [ ] Do not spend time on optional items until all required APIs, tests, and docs are complete
 - [ ] Keep POST MVP items out of the core delivery scope until all required APIs, tests, and docs are complete
-- [ ] Do not add Redis, queues, or extra infrastructure
-- [ ] Do not add Spring Security for this take-home
-- [ ] Keep the solution boring and reliable
 
 ## 13. Final check before submission
 

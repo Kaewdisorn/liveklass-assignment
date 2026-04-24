@@ -10,7 +10,8 @@ public enum ErrorCode {
     DUPLICATE_ENROLLMENT(HttpStatus.CONFLICT, "Active enrollment already exists."),
     INVALID_STATE_TRANSITION(HttpStatus.CONFLICT, "Invalid state transition."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "You do not have permission to perform this action."),
-    NOT_FOUND(HttpStatus.NOT_FOUND, "Requested resource was not found.");
+    NOT_FOUND(HttpStatus.NOT_FOUND, "Requested resource was not found."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error.");
 
     private final HttpStatus httpStatus;
     private final String defaultMessage;

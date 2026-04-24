@@ -5,6 +5,7 @@ import java.net.URI;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,11 +36,15 @@ public class CourseController {
             @CurrentUser RequestUser requestUser,
             @Valid @RequestBody CreateCourseRequest request) {
         CourseDetailResponse response = courseService.createCourse(requestUser, request);
+        return ResponseEntity
+                .created(URI.create("/classes/" + response.courseId()))
+                .body(response);
+    }
 
-        // return ResponseEntity
-        // .created(URI.create("/api/classes/" + response.courseId()))
-        // .body(response);
-        return ResponseEntity.ok(response);
+    // Course 상세 조회
+    @GetMapping("/{courseId}")
+    public ResponseEntity<CourseDetailResponse> getCourse(@PathVariable Long courseId) {
+        return ResponseEntity.ok(courseService.getCourse(courseId));
     }
 
     @GetMapping("/test")
