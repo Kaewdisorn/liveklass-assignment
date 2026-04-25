@@ -1,7 +1,5 @@
 package com.example.liveklass.course.service;
 
-import java.util.List;
-
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,16 +12,10 @@ import com.example.liveklass.course.dto.CreateCourseRequest;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
-import com.example.liveklass.enrollment.enums.EnrollmentStatus;
-import com.example.liveklass.enrollment.repository.EnrollmentRepository;
 
 @Service
 @Transactional(readOnly = true)
 public class CourseServiceImpl implements CourseService {
-
-    private static final List<EnrollmentStatus> ACTIVE_STATUSES = List.of(
-            EnrollmentStatus.PENDING,
-            EnrollmentStatus.CONFIRMED);
 
     private final CourseRepository courseRepository;
 
