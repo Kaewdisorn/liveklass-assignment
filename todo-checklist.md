@@ -12,7 +12,7 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Course creation scaffolding exists across DTO, controller, service, and persistence
 - [x] `./mvnw test` passes with Testcontainers PostgreSQL and Flyway
 - [x] Docker Compose exists at `docker/postgres-compose.yml`
-- [ ] `GlobalExceptionHandler` still has commented-out DB-integrity and catch-all handlers
+- [x] `GlobalExceptionHandler` still has commented-out DB-integrity and catch-all handlers
 - [ ] Course API is still incomplete: create returns `200 OK`, `/classes/test` is still present, and detail/list/status-change endpoints do not exist
 - [ ] Enrollment service and controller layers do not exist yet
 - [ ] README is still a placeholder
@@ -44,16 +44,16 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Validate course create request fields: title, description, price, capacity, start date, end date
 - [x] Allow only `CREATOR` to create courses
 - [x] Save new courses with initial `DRAFT` status
-- [ ] Return `201 Created` and `Location` header from course create API
+- [x] Return `201 Created` and `Location` header from course create API
 - [ ] Remove temporary `/classes/test` endpoint
-- [ ] Implement course status change API
-- [ ] Implement course list API with optional `status` filter
-- [ ] Implement course detail API
+- [x] Implement course status change API
+- [x] Implement course list API with optional `status` filter
+- [x] Implement course detail API
 - [ ] Return current active enrollment count from course detail
-- [ ] Allow only `CREATOR` to change course status
-- [ ] Enforce `DRAFT -> OPEN -> CLOSED` only
-- [ ] Reject all other transitions explicitly
-- [ ] Keep naming consistent between API, DTO, and domain, or document the mapping clearly
+- [x] Allow only `CREATOR` to change course status
+- [x] Enforce `DRAFT -> OPEN -> CLOSED` only
+- [x] Reject all other transitions explicitly
+- [x] Keep naming consistent between API, DTO, and domain, or document the mapping clearly
 
 ## 4. Enrollment flow
 
@@ -102,14 +102,14 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Define small, clear error codes
 - [x] Keep error response structure consistent with `ErrorResponse`
 - [x] Reject missing or invalid auth headers with `UNAUTHORIZED`
-- [ ] Enable `DataIntegrityViolationException` mapping
-- [ ] Add catch-all unexpected exception mapping
+- [x] Enable `DataIntegrityViolationException` mapping
+- [x] Add catch-all unexpected exception mapping
 - [ ] Use `COURSE_NOT_OPEN` for both `DRAFT` and `CLOSED`
-- [ ] Return consistent errors for invalid state transitions
-- [ ] Return `FORBIDDEN` for role or ownership failures
-- [ ] Return `NOT_FOUND` for missing course or enrollment
+- [x] Return consistent errors for invalid state transitions
+- [x] Return `FORBIDDEN` for role or ownership failures
+- [x] Return `NOT_FOUND` for missing course or enrollment
 - [ ] Map database exceptions such as `DataIntegrityViolationException` to business errors where needed
-- [ ] Avoid returning JPA entities directly from controllers
+- [x] Avoid returning JPA entities directly from controllers
 
 ## 7. Tests
 
