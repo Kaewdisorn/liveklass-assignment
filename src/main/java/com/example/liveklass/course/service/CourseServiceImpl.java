@@ -99,6 +99,10 @@ public class CourseServiceImpl implements CourseService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
 
+        if (!course.getCreatorId().equals(requestUser.userId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the course creator can change the status.");
+        }
+
         validateTransition(course.getStatus(), request.status());
         course.setStatus(request.status());
         log.info("Course status updated: courseId={}, newStatus={}", courseId, request.status());

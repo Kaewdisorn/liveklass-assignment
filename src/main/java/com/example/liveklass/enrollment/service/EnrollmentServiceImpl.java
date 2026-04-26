@@ -85,6 +85,13 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         Enrollment enrollment = enrollmentRepository.findByIdForUpdate(enrollmentId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Enrollment not found."));
 
+        Course course = courseRepository.findById(enrollment.getCourseId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
+
+        if (!course.getCreatorId().equals(requestUser.userId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the course creator can confirm enrollments.");
+        }
+
         if (enrollment.getStatus() != EnrollmentStatus.PENDING) {
             throw new BusinessException(
                     ErrorCode.INVALID_STATE_TRANSITION,
