@@ -12,6 +12,7 @@ import com.example.liveklass.common.error.ErrorCode;
 import com.example.liveklass.course.dto.CourseDetailResponse;
 import com.example.liveklass.course.dto.CourseSummaryResponse;
 import com.example.liveklass.course.dto.CreateCourseRequest;
+import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
@@ -78,6 +79,24 @@ public class CourseServiceImpl implements CourseService {
                 .toList();
     }
 
+    @Override
+    @Transactional
+    public CourseDetailResponse updateCourseStatus(
+            RequestUser requestUser,
+            Long courseId,
+            UpdateCourseStatusRequest request) {
+        assertCreator(requestUser);
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
+
+        validateTransition(course.getStatus(), request.status());
+        course.setStatus(request.status());
+
+        return toDetailResponse(course, 0L);
+
+    }
+
     private void assertCreator(RequestUser requestUser) {
         if (requestUser.role() != UserRole.CREATOR) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Creator role is required.");
@@ -98,6 +117,22 @@ public class CourseServiceImpl implements CourseService {
                 activeEnrollmentCount,
                 course.getCreatedAt(),
                 course.getUpdatedAt());
+    }
+
+    private void validateTransition(CourseStatus currentStatus, CourseStatus nextStatus) {
+        boolean valid = false;
+
+        if (currentStatus == CourseStatus.DRAFT && nextStatus == CourseStatus.OPEN ||
+                currentStatus == CourseStatus.OPEN && nextStatus == CourseStatus.CLOSED) {
+            valid = true;
+
+        }
+
+        if (!valid) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_STATE_TRANSITION,
+                    "Invalid course status transition.");
+        }
     }
 
 }
