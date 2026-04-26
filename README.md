@@ -194,7 +194,7 @@ Windows PowerShell:
 
 - 통합 테스트는 Testcontainers PostgreSQL(`postgres:16`)을 사용합니다.
 - 테스트 실행을 위해 로컬 PostgreSQL을 별도로 띄울 필요는 없습니다.
-- 2026-04-27 기준 결과: 테스트 109건, 실패 0건, 에러 0건
+- 2026-04-27 기준 결과: 테스트 123건, 실패 0건, 에러 0건
 
 ## 요구사항 해석과 가정
 
@@ -211,12 +211,13 @@ Windows PowerShell:
 
 ### 강의 API
 
-| 메서드  | 경로                         | 권한      | 설명           |
-| ------- | ---------------------------- | --------- | -------------- |
-| `POST`  | `/classes`                   | `CREATOR` | 강의 생성      |
-| `GET`   | `/classes`                   | 공개      | 강의 목록 조회 |
-| `GET`   | `/classes/{courseId}`        | 공개      | 강의 상세 조회 |
-| `PATCH` | `/classes/{courseId}/status` | `CREATOR` | 강의 상태 변경 |
+| 메서드  | 경로                                    | 권한      | 설명                           |
+| ------- | --------------------------------------- | --------- | ------------------------------ |
+| `POST`  | `/classes`                              | `CREATOR` | 강의 생성                      |
+| `GET`   | `/classes`                              | 공개      | 강의 목록 조회                 |
+| `GET`   | `/classes/{courseId}`                   | 공개      | 강의 상세 조회                 |
+| `PATCH` | `/classes/{courseId}/status`            | `CREATOR` | 강의 상태 변경                 |
+| `GET`   | `/classes/{courseId}/enrollments`       | `CREATOR` | 강의별 수강생 목록 조회 (소유자 전용) |
 
 ### 수강 신청 API
 
@@ -408,6 +409,37 @@ X-User-Role: STUDENT
 }
 ```
 
+### 7. 강의별 수강생 목록 조회 (크리에이터 전용)
+
+요청:
+
+```http
+GET /classes/1/enrollments?page=0&size=20
+X-User-Id: 1
+X-User-Role: CREATOR
+```
+
+응답:
+
+```json
+{
+  "content": [
+    {
+      "enrollmentId": 100,
+      "studentId": 10,
+      "status": "CONFIRMED",
+      "requestedAt": "2026-04-27T01:05:00Z",
+      "updatedAt": "2026-04-27T01:06:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1,
+  "last": true
+}
+```
+
 ## 에러 응답 형식
 
 모든 에러 응답은 같은 구조를 사용합니다.
@@ -429,6 +461,7 @@ X-User-Role: STUDENT
 | `UNAUTHORIZED`             | 401       | 인증 헤더 누락 또는 형식 오류            |
 | `FORBIDDEN`                | 403       | 권한 없음 (역할 불일치 또는 소유자 아님) |
 | `NOT_FOUND`                | 404       | 리소스 없음                              |
+| `COURSE_NOT_FOUND`         | 404       | 강의 없음                                |
 | `INVALID_STATE_TRANSITION` | 409       | 허용되지 않은 상태 전이                  |
 | `DUPLICATE_ENROLLMENT`     | 409       | 이미 활성 수강 신청이 존재함             |
 | `COURSE_NOT_OPEN`          | 409       | 모집 중이 아닌 강의에 신청 시도          |
@@ -537,13 +570,13 @@ X-User-Role: STUDENT
 ## 미구현 또는 범위 밖 항목
 
 - 대기열(waitlist)
-- 강의별 수강생 목록 조회
+- 취소 가능 기간/환불 정책
 - 실제 인증/인가 인프라
 - 외부 결제 연동
-- 취소 가능 기간/환불 정책
 
 ## 구현 상태 요약
 
 - 동시성 테스트는 성공/실패 HTTP 상태, 정확한 에러 코드, 최종 DB 상태를 모두 검증합니다.
 - 락 타임아웃 발생 시 `LOCK_TIMEOUT(409)` 에러 코드를 반환합니다.
 - 강의 상태 변경과 수강 신청 확정은 해당 강의를 생성한 크리에이터 본인만 가능합니다.
+- 강의별 수강생 목록 조회(`GET /classes/{courseId}/enrollments`)는 강의 소유 CREATOR만 호출할 수 있습니다.
