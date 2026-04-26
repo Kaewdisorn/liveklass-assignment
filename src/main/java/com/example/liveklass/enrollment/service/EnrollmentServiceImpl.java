@@ -16,8 +16,10 @@ import com.example.liveklass.common.error.ErrorCode;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
+import com.example.liveklass.enrollment.dto.CourseEnrollmentResponse;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedCourseEnrollmentResponse;
 import com.example.liveklass.enrollment.dto.PagedEnrollmentResponse;
 import com.example.liveklass.enrollment.entity.Enrollment;
 import com.example.liveklass.enrollment.enums.EnrollmentStatus;
@@ -144,6 +146,31 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 page.isLast());
     }
 
+    @Override
+    public PagedCourseEnrollmentResponse getCourseEnrollments(RequestUser requestUser, Long courseId,
+            Pageable pageable) {
+        if (requestUser.role() != UserRole.CREATOR) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Creator role is required.");
+        }
+
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND, "Course not found."));
+
+        if (!course.getCreatorId().equals(requestUser.userId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Only the course creator can view enrollments.");
+        }
+
+        Page<Enrollment> page = enrollmentRepository.findByCourseIdOrderByRequestedAtDesc(courseId, pageable);
+
+        return new PagedCourseEnrollmentResponse(
+                page.getContent().stream().map(this::toCourseEnrollmentResponse).toList(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast());
+    }
+
     private void assertStudent(RequestUser requestUser) {
         if (requestUser.role() != UserRole.STUDENT) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Student role is required.");
@@ -160,6 +187,15 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         return new EnrollmentResponse(
                 enrollment.getId(),
                 enrollment.getCourseId(),
+                enrollment.getStudentId(),
+                enrollment.getStatus(),
+                enrollment.getRequestedAt(),
+                enrollment.getUpdatedAt());
+    }
+
+    private CourseEnrollmentResponse toCourseEnrollmentResponse(Enrollment enrollment) {
+        return new CourseEnrollmentResponse(
+                enrollment.getId(),
                 enrollment.getStudentId(),
                 enrollment.getStatus(),
                 enrollment.getRequestedAt(),
