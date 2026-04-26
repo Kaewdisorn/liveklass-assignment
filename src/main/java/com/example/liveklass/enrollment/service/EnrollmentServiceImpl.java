@@ -2,6 +2,8 @@ package com.example.liveklass.enrollment.service;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,8 @@ import com.example.liveklass.enrollment.repository.EnrollmentRepository;
 @Service
 @Transactional(readOnly = true)
 public class EnrollmentServiceImpl implements EnrollmentService {
+
+    private static final Logger log = LoggerFactory.getLogger(EnrollmentServiceImpl.class);
 
     private static final List<EnrollmentStatus> ACTIVE_STATUSES = List.of(
             EnrollmentStatus.PENDING,
@@ -66,7 +70,10 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         enrollment.setStudentId(requestUser.userId());
         enrollment.setStatus(EnrollmentStatus.PENDING);
 
-        return toResponse(enrollmentRepository.saveAndFlush(enrollment));
+        Enrollment saved = enrollmentRepository.saveAndFlush(enrollment);
+        log.info("Enrollment created: enrollmentId={}, courseId={}, studentId={}",
+                saved.getId(), saved.getCourseId(), saved.getStudentId());
+        return toResponse(saved);
 
     }
 
@@ -85,6 +92,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         }
 
         enrollment.setStatus(EnrollmentStatus.CONFIRMED);
+        log.info("Enrollment confirmed: enrollmentId={}", enrollmentId);
         return toResponse(enrollment);
     }
 
@@ -108,6 +116,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         }
 
         enrollment.setStatus(EnrollmentStatus.CANCELLED);
+        log.info("Enrollment cancelled: enrollmentId={} by userId={}", enrollmentId, requestUser.userId());
         return toResponse(enrollment);
     }
 

@@ -2,6 +2,8 @@ package com.example.liveklass.course.service;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,8 @@ import com.example.liveklass.enrollment.repository.EnrollmentRepository;
 @Service
 @Transactional(readOnly = true)
 public class CourseServiceImpl implements CourseService {
+
+    private static final Logger log = LoggerFactory.getLogger(CourseServiceImpl.class);
 
     private final CourseRepository courseRepository;
     private final EnrollmentRepository enrollmentRepository;
@@ -47,6 +51,7 @@ public class CourseServiceImpl implements CourseService {
         course.setStatus(CourseStatus.DRAFT);
 
         Course savedCourse = courseRepository.save(course);
+        log.info("Course created: courseId={}, creatorId={}", savedCourse.getId(), savedCourse.getCreatorId());
         return toDetailResponse(savedCourse, 0L);
     }
 
@@ -96,6 +101,7 @@ public class CourseServiceImpl implements CourseService {
 
         validateTransition(course.getStatus(), request.status());
         course.setStatus(request.status());
+        log.info("Course status updated: courseId={}, newStatus={}", courseId, request.status());
 
         return toDetailResponse(course, activeEnrollmentCount(courseId));
 
