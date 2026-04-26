@@ -23,6 +23,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import com.example.liveklass.common.config.RequestUser;
 import com.example.liveklass.common.config.UserRole;
@@ -33,6 +37,7 @@ import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedEnrollmentResponse;
 import com.example.liveklass.enrollment.entity.Enrollment;
 import com.example.liveklass.enrollment.enums.EnrollmentStatus;
 import com.example.liveklass.enrollment.repository.EnrollmentRepository;
@@ -360,31 +365,40 @@ class EnrollmentServiceTest {
             List<Enrollment> enrollments = List.of(
                     buildEnrollment(1L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED),
                     buildEnrollment(2L, 6L, STUDENT.userId(), EnrollmentStatus.PENDING));
+            Pageable pageable = PageRequest.of(0, 20);
+            Page<Enrollment> page = new PageImpl<>(enrollments, pageable, enrollments.size());
 
-            when(enrollmentRepository.findByStudentIdOrderByRequestedAtDesc(STUDENT.userId()))
-                    .thenReturn(enrollments);
+            when(enrollmentRepository.findByStudentIdOrderByRequestedAtDesc(STUDENT.userId(), pageable))
+                    .thenReturn(page);
 
-            List<EnrollmentResponse> result = enrollmentService.getMyEnrollments(STUDENT);
+            PagedEnrollmentResponse result = enrollmentService.getMyEnrollments(STUDENT, pageable);
 
-            assertThat(result).hasSize(2);
-            assertThat(result.get(0).enrollmentId()).isEqualTo(1L);
-            assertThat(result.get(0).status()).isEqualTo(EnrollmentStatus.CONFIRMED);
-            assertThat(result.get(1).enrollmentId()).isEqualTo(2L);
-            assertThat(result.get(1).status()).isEqualTo(EnrollmentStatus.PENDING);
+            assertThat(result.content()).hasSize(2);
+            assertThat(result.content().get(0).enrollmentId()).isEqualTo(1L);
+            assertThat(result.content().get(0).status()).isEqualTo(EnrollmentStatus.CONFIRMED);
+            assertThat(result.content().get(1).enrollmentId()).isEqualTo(2L);
+            assertThat(result.content().get(1).status()).isEqualTo(EnrollmentStatus.PENDING);
+            assertThat(result.totalElements()).isEqualTo(2);
+            assertThat(result.totalPages()).isEqualTo(1);
+            assertThat(result.last()).isTrue();
 
-            verify(enrollmentRepository).findByStudentIdOrderByRequestedAtDesc(STUDENT.userId());
+            verify(enrollmentRepository).findByStudentIdOrderByRequestedAtDesc(STUDENT.userId(), pageable);
         }
 
         @Test
         @DisplayName("수강 신청 내역 없는 경우 빈 목록 반환")
         void getMyEnrollments_emptyList() {
-            when(enrollmentRepository.findByStudentIdOrderByRequestedAtDesc(STUDENT.userId()))
-                    .thenReturn(List.of());
+            Pageable pageable = PageRequest.of(0, 20);
+            Page<Enrollment> page = new PageImpl<>(List.of(), pageable, 0);
 
-            List<EnrollmentResponse> result = enrollmentService.getMyEnrollments(STUDENT);
+            when(enrollmentRepository.findByStudentIdOrderByRequestedAtDesc(STUDENT.userId(), pageable))
+                    .thenReturn(page);
 
-            assertThat(result).isEmpty();
-            verify(enrollmentRepository).findByStudentIdOrderByRequestedAtDesc(STUDENT.userId());
+            PagedEnrollmentResponse result = enrollmentService.getMyEnrollments(STUDENT, pageable);
+
+            assertThat(result.content()).isEmpty();
+            assertThat(result.totalElements()).isEqualTo(0);
+            verify(enrollmentRepository).findByStudentIdOrderByRequestedAtDesc(STUDENT.userId(), pageable);
         }
     }
 }

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,6 +20,7 @@ import com.example.liveklass.common.error.BusinessException;
 import com.example.liveklass.common.error.ErrorCode;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedEnrollmentResponse;
 import com.example.liveklass.enrollment.enums.EnrollmentStatus;
 import com.example.liveklass.enrollment.service.EnrollmentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -399,41 +401,49 @@ class EnrollmentControllerTest {
         class GetMyEnrollments {
 
                 @Test
-                @DisplayName("정상 조회 시 200 OK와 목록 반환")
+                @DisplayName("정상 조회 시 200 OK와 페이징 응답 반환")
                 void getMyEnrollments_success() throws Exception {
-                        List<EnrollmentResponse> responses = List.of(
+                        List<EnrollmentResponse> items = List.of(
                                         buildEnrollmentResponse(EnrollmentStatus.PENDING),
                                         buildEnrollmentResponse(EnrollmentStatus.CONFIRMED));
+                        PagedEnrollmentResponse response = new PagedEnrollmentResponse(items, 0, 20, 2, 1, true);
 
-                        when(enrollmentService.getMyEnrollments(any(RequestUser.class))).thenReturn(responses);
+                        when(enrollmentService.getMyEnrollments(any(RequestUser.class), any(Pageable.class)))
+                                        .thenReturn(response);
 
                         mockMvc.perform(get("/enrollments/me")
                                         .header("X-User-Id", STUDENT_ID)
                                         .header("X-User-Role", STUDENT_ROLE))
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$").isArray())
-                                        .andExpect(jsonPath("$.length()").value(2))
-                                        .andExpect(jsonPath("$[0].status").value("PENDING"))
-                                        .andExpect(jsonPath("$[1].status").value("CONFIRMED"));
+                                        .andExpect(jsonPath("$.content").isArray())
+                                        .andExpect(jsonPath("$.content.length()").value(2))
+                                        .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+                                        .andExpect(jsonPath("$.content[1].status").value("CONFIRMED"))
+                                        .andExpect(jsonPath("$.totalElements").value(2))
+                                        .andExpect(jsonPath("$.totalPages").value(1))
+                                        .andExpect(jsonPath("$.last").value(true));
 
                         ArgumentCaptor<RequestUser> userCaptor = ArgumentCaptor.forClass(RequestUser.class);
-                        verify(enrollmentService).getMyEnrollments(userCaptor.capture());
+                        verify(enrollmentService).getMyEnrollments(userCaptor.capture(), any(Pageable.class));
                         assertThat(userCaptor.getValue().userId()).isEqualTo(10L);
                 }
 
                 @Test
-                @DisplayName("수강 신청 내역 없는 경우 200 OK와 빈 배열 반환")
+                @DisplayName("수강 신청 내역 없는 경우 200 OK와 빈 content 반환")
                 void getMyEnrollments_emptyList() throws Exception {
-                        when(enrollmentService.getMyEnrollments(any())).thenReturn(List.of());
+                        PagedEnrollmentResponse response = new PagedEnrollmentResponse(List.of(), 0, 20, 0, 0, true);
+                        when(enrollmentService.getMyEnrollments(any(RequestUser.class), any(Pageable.class)))
+                                        .thenReturn(response);
 
                         mockMvc.perform(get("/enrollments/me")
                                         .header("X-User-Id", STUDENT_ID)
                                         .header("X-User-Role", STUDENT_ROLE))
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$").isArray())
-                                        .andExpect(jsonPath("$").isEmpty());
+                                        .andExpect(jsonPath("$.content").isArray())
+                                        .andExpect(jsonPath("$.content").isEmpty())
+                                        .andExpect(jsonPath("$.totalElements").value(0));
 
-                        verify(enrollmentService).getMyEnrollments(any());
+                        verify(enrollmentService).getMyEnrollments(any(RequestUser.class), any(Pageable.class));
                 }
 
                 @Test
@@ -444,7 +454,7 @@ class EnrollmentControllerTest {
                                         .andExpect(jsonPath("$.code").value(ErrorCode.UNAUTHORIZED.name()))
                                         .andExpect(jsonPath("$.path").value("/enrollments/me"));
 
-                        verify(enrollmentService, never()).getMyEnrollments(any());
+                        verify(enrollmentService, never()).getMyEnrollments(any(), any());
                 }
         }
 }

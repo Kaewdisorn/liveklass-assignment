@@ -372,18 +372,21 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
                     .header("X-User-Id", STUDENT1_ID)
                     .header("X-User-Role", STUDENT_ROLE))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(1))
-                    .andExpect(jsonPath("$[0].studentId").value(Long.parseLong(STUDENT1_ID)));
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].studentId").value(Long.parseLong(STUDENT1_ID)))
+                    .andExpect(jsonPath("$.totalElements").value(1));
         }
 
         @Test
-        @DisplayName("신청 없을 시 빈 배열 반환")
+        @DisplayName("신청 없을 시 빈 content 반환")
         void getMyEnrollments_none_returnsEmptyList() throws Exception {
             mockMvc.perform(get("/enrollments/me")
                     .header("X-User-Id", STUDENT1_ID)
                     .header("X-User-Role", STUDENT_ROLE))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(0));
+                    .andExpect(jsonPath("$.content").isArray())
+                    .andExpect(jsonPath("$.content").isEmpty())
+                    .andExpect(jsonPath("$.totalElements").value(0));
         }
 
         @Test
@@ -401,8 +404,10 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
                     .header("X-User-Id", STUDENT1_ID)
                     .header("X-User-Role", STUDENT_ROLE))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.length()").value(1))
-                    .andExpect(jsonPath("$[0].status").value("CANCELLED"));
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.content[0].status").value("CANCELLED"))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.totalPages").value(1));
         }
 
         @Test
