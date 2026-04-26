@@ -13,9 +13,12 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] `./mvnw test` passes with Testcontainers PostgreSQL and Flyway
 - [x] Docker Compose exists at `docker/postgres-compose.yml`
 - [x] Unit tests and API-level integration tests exist for course and enrollment flows
-- [ ] Race-condition scenarios are still missing real multi-threaded integration coverage
-- [ ] DB unique-constraint races still fall back to generic `BAD_REQUEST` instead of `DUPLICATE_ENROLLMENT`
-- [ ] README is incomplete and partially out of sync with the current implementation
+- [x] Real multi-threaded concurrency integration coverage exists in `EnrollmentConcurrencyTest`
+- [x] Duplicate active-enrollment constraint mapping to `DUPLICATE_ENROLLMENT` exists in `GlobalExceptionHandler`
+- [x] README has been updated to match the current implementation
+- [ ] Concurrency tests still assert generic `409` outcomes rather than exact losing error codes
+- [ ] Lock-timeout-specific exception mapping is still missing
+- [ ] Ownership semantics are still role-based only; verify whether stricter creator ownership is expected
 
 ## 1. Project setup
 
@@ -83,7 +86,7 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Assume PostgreSQL default isolation level (`READ COMMITTED`)
 - [x] Rely on row-level locking for correctness under that isolation level
 - [x] Rely on the course row lock for capacity consistency, and the DB unique constraint for duplicate protection
-- [ ] Consider lock wait timeout behavior so enrollment requests do not block forever
+- [x] Configure lock wait timeout behavior (`hibernate.jakarta.persistence.lock.timeout=5000`)
 - [x] Count active enrollments inside the locked transaction
 - [x] Ensure the count query explicitly filters only active statuses: `PENDING`, `CONFIRMED`
 - [x] Reject enrollment when active count has reached capacity
@@ -93,8 +96,9 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Wrap confirm and cancel in their own transactions
 - [x] Load enrollment with `PESSIMISTIC_WRITE` for confirm and cancel
 - [x] Ensure only one state transition can succeed per enrollment under concurrent requests
-- [ ] Convert unique-constraint violations to `DUPLICATE_ENROLLMENT`
+- [x] Convert unique-constraint violations to `DUPLICATE_ENROLLMENT`
 - [x] Treat the service-level duplicate check as a fast-fail optimization; the database is the final source of truth
+- [ ] Map lock-timeout or lock-acquisition failures to a stable API error instead of relying on generic fallback handling
 
 ## 6. Error handling
 
@@ -108,43 +112,45 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Return consistent errors for invalid state transitions
 - [x] Return `FORBIDDEN` for role or ownership failures
 - [x] Return `NOT_FOUND` for missing course or enrollment
-- [ ] Map database exceptions such as `DataIntegrityViolationException` to business errors where needed
+- [x] Map database exceptions such as `DataIntegrityViolationException` to business errors where needed
 - [x] Avoid returning JPA entities directly from controllers
+- [ ] Add explicit handling for lock timeout / lock acquisition exceptions under contention
 
 ## 7. Tests
 
 - [x] Keep Testcontainers PostgreSQL integration support in place
 - [x] Keep the current smoke test passing
-- [x] Replace the placeholder `contextLoads` test with BE-A integration tests
+- [x] Keep the minimal `contextLoads` smoke test alongside the BE-A integration tests
 - [x] Test course creation success
 - [x] Test invalid course status transition
 - [x] Test enrollment rejected for `DRAFT` or `CLOSED`
 - [x] Test duplicate active enrollment rejection
 - [x] Test capacity full rejection
 - [x] Test confirm and cancel state rules
-- [ ] Test last-seat race: exactly one request succeeds and the others fail with `COURSE_FULL`
-- [ ] Test same-student double submit: only one active enrollment is created
-- [ ] Test confirm vs cancel race on the same enrollment: only one state change succeeds
-- [ ] Use real multi-threaded execution to simulate concurrency
-- [ ] Use a latch or barrier to align concurrent start timing in race-condition tests
+- [x] Test last-seat race: exactly one request succeeds and the others fail with `409`
+- [x] Test same-student double submit: only one active enrollment is created
+- [x] Test confirm vs cancel race on the same enrollment: only one state change succeeds
+- [x] Use real multi-threaded execution to simulate concurrency
+- [x] Use a latch or barrier to align concurrent start timing in race-condition tests
 - [x] Keep test focus on integration tests, not a big controller test suite
+- [ ] Strengthen concurrency assertions to verify the exact error code for each losing path (`COURSE_FULL`, `DUPLICATE_ENROLLMENT`, `INVALID_STATE_TRANSITION`)
 
 ## 8. README
 
-- [ ] Replace the placeholder README with the required assignment sections
+- [x] Replace the placeholder README with the required assignment sections
 - [x] Add project overview
 - [x] Add tech stack
 - [x] Add local run instructions
 - [x] Add Docker-based run instructions for the database dependency
-- [ ] Add test run instructions
+- [x] Add test run instructions
 - [x] Add requirement interpretation and assumptions
-- [ ] Add API list and sample requests/responses
-- [ ] Add a short concurrency design summary
-- [ ] Include one concrete race scenario example
+- [x] Add API list and sample requests/responses
+- [x] Add a short concurrency design summary
+- [x] Include one concrete race scenario example
 - [x] Add data model description plus DB schema or ERD explanation
 - [x] Add design decisions and reasons
-- [ ] Add trade-offs
-- [ ] Add AI usage scope
+- [x] Add trade-offs
+- [x] Add AI usage scope
 - [x] Add unimplemented items and constraints
 
 ## 9. Product-level edge cases
@@ -157,14 +163,14 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 
 ## 10. Important notes to explain in README
 
-- [ ] Explain that `PENDING` reserves a seat
-- [ ] Explain why pessimistic locking was chosen
-- [ ] Explain why `COUNT` was chosen over a counter field
-- [ ] Explain that uniqueness is enforced in both service logic and the database
-- [ ] Explain that the service duplicate check is only a fast-fail path and the database is the final source of truth
+- [x] Explain that `PENDING` reserves a seat
+- [x] Explain why pessimistic locking was chosen
+- [x] Explain why `COUNT` was chosen over a counter field
+- [x] Explain that uniqueness is enforced in both service logic and the database
+- [x] Explain that the service duplicate check is only a fast-fail path and the database is the final source of truth
 - [ ] Explain that closing a course blocks new enrollments only
-- [ ] Explain that payment is simplified as a status change
-- [ ] Document the mapping between API naming (`classes`) and domain naming (`course`)
+- [x] Explain that payment is simplified as a status change
+- [x] Document the mapping between API naming (`classes`) and domain naming (`course`)
 
 ## 11. POST MVP
 
