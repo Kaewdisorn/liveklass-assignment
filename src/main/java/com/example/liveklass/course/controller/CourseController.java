@@ -3,6 +3,9 @@ package com.example.liveklass.course.controller;
 import java.net.URI;
 import java.util.List;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +25,8 @@ import com.example.liveklass.course.dto.CreateCourseRequest;
 import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.service.CourseService;
+import com.example.liveklass.enrollment.dto.PagedCourseEnrollmentResponse;
+import com.example.liveklass.enrollment.service.EnrollmentService;
 
 import jakarta.validation.Valid;
 
@@ -31,9 +36,11 @@ import jakarta.validation.Valid;
 public class CourseController {
 
     private final CourseService courseService;
+    private final EnrollmentService enrollmentService;
 
-    public CourseController(CourseService courseService) {
+    public CourseController(CourseService courseService, EnrollmentService enrollmentService) {
         this.courseService = courseService;
+        this.enrollmentService = enrollmentService;
     }
 
     // Course 등록
@@ -67,6 +74,15 @@ public class CourseController {
             @PathVariable Long courseId,
             @Valid @RequestBody UpdateCourseStatusRequest request) {
         return ResponseEntity.ok(courseService.updateCourseStatus(requestUser, courseId, request));
+    }
+
+    // 강의별 수강생 목록 조회 (크리에이터 전용)
+    @GetMapping("/{courseId}/enrollments")
+    public ResponseEntity<PagedCourseEnrollmentResponse> getCourseEnrollments(
+            @CurrentUser RequestUser requestUser,
+            @PathVariable Long courseId,
+            @PageableDefault(size = 20, sort = "requestedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(enrollmentService.getCourseEnrollments(requestUser, courseId, pageable));
     }
 
 }
