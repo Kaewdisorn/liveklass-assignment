@@ -16,15 +16,19 @@ import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
+import com.example.liveklass.enrollment.enums.EnrollmentStatus;
+import com.example.liveklass.enrollment.repository.EnrollmentRepository;
 
 @Service
 @Transactional(readOnly = true)
 public class CourseServiceImpl implements CourseService {
 
     private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
-    public CourseServiceImpl(CourseRepository courseRepository) {
+    public CourseServiceImpl(CourseRepository courseRepository, EnrollmentRepository enrollmentRepository) {
         this.courseRepository = courseRepository;
+        this.enrollmentRepository = enrollmentRepository;
     }
 
     @Override
@@ -52,7 +56,7 @@ public class CourseServiceImpl implements CourseService {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
 
-        return toDetailResponse(course, 0L);
+        return toDetailResponse(course, activeEnrollmentCount(courseId));
     }
 
     @Override
@@ -93,7 +97,7 @@ public class CourseServiceImpl implements CourseService {
         validateTransition(course.getStatus(), request.status());
         course.setStatus(request.status());
 
-        return toDetailResponse(course, 0L);
+        return toDetailResponse(course, activeEnrollmentCount(courseId));
 
     }
 
@@ -133,6 +137,12 @@ public class CourseServiceImpl implements CourseService {
                     ErrorCode.INVALID_STATE_TRANSITION,
                     "Invalid course status transition.");
         }
+    }
+
+    private long activeEnrollmentCount(Long courseId) {
+        return enrollmentRepository.countByCourseIdAndStatusIn(
+                courseId,
+                List.of(EnrollmentStatus.PENDING, EnrollmentStatus.CONFIRMED));
     }
 
 }

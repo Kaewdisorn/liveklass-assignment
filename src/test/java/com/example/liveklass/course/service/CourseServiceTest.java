@@ -77,7 +77,7 @@ class CourseServiceTest {
 
     @BeforeEach
     void setUp() {
-        courseService = new CourseServiceImpl(courseRepository);
+        courseService = new CourseServiceImpl(courseRepository, null);
     }
 
     // =========================

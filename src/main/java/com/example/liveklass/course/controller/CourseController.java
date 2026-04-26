@@ -69,8 +69,4 @@ public class CourseController {
         return ResponseEntity.ok(courseService.updateCourseStatus(requestUser, courseId, request));
     }
 
-    @GetMapping("/test")
-    public String test() {
-        return "hello";
-    }
 }
