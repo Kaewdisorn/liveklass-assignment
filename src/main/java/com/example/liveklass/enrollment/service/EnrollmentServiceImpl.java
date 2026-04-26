@@ -91,6 +91,29 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         return toResponse(enrollment);
     }
 
+    @Override
+    @Transactional
+    public EnrollmentResponse cancelEnrollment(RequestUser requestUser, Long enrollmentId) {
+        Enrollment enrollment = enrollmentRepository.findByIdForUpdate(enrollmentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Enrollment not found."));
+
+        boolean isOwner = enrollment.getStudentId().equals(requestUser.userId());
+        boolean isCreator = requestUser.role() == UserRole.CREATOR;
+
+        if (!isOwner && !isCreator) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "You cannot cancel this enrollment.");
+        }
+
+        if (enrollment.getStatus() == EnrollmentStatus.CANCELLED) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_STATE_TRANSITION,
+                    "Enrollment is already cancelled.");
+        }
+
+        enrollment.setStatus(EnrollmentStatus.CANCELLED);
+        return toResponse(enrollment);
+    }
+
     private void assertStudent(RequestUser requestUser) {
         if (requestUser.role() != UserRole.STUDENT) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Student role is required.");
