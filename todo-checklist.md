@@ -4,19 +4,18 @@ Simple checklist for finishing the BE-A take-home without losing track of what i
 
 Main goal: complete the required APIs, make enrollment concurrency safe, and leave a repo that is easy to review.
 
-## 0. Current review snapshot (2026-04-23)
+## 0. Current review snapshot (2026-04-27)
 
 - [x] Spring Boot app, Flyway migration, entities, enums, and baseline repositories exist
 - [x] Lightweight auth is decided and implemented with `X-User-Id` and `X-User-Role`
-- [x] Shared error model exists and business plus validation handlers are active
-- [x] Course creation scaffolding exists across DTO, controller, service, and persistence
+- [x] Shared error model exists and business, validation, DB-integrity, and catch-all handlers are active
+- [x] All required APIs implemented: course create/list/detail/status change and enrollment create/confirm/cancel/list
 - [x] `./mvnw test` passes with Testcontainers PostgreSQL and Flyway
 - [x] Docker Compose exists at `docker/postgres-compose.yml`
-- [x] `GlobalExceptionHandler` still has commented-out DB-integrity and catch-all handlers
-- [ ] Course API is still incomplete: create returns `200 OK`, `/classes/test` is still present, and detail/list/status-change endpoints do not exist
-- [ ] Enrollment service and controller layers do not exist yet
-- [ ] README is still a placeholder
-- [ ] Test coverage is still smoke-only: `LiveklassApplicationTests` still contains only `contextLoads`
+- [x] Unit tests and API-level integration tests exist for course and enrollment flows
+- [ ] Race-condition scenarios are still missing real multi-threaded integration coverage
+- [ ] DB unique-constraint races still fall back to generic `BAD_REQUEST` instead of `DUPLICATE_ENROLLMENT`
+- [ ] README is incomplete and partially out of sync with the current implementation
 
 ## 1. Project setup
 
@@ -45,11 +44,11 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Allow only `CREATOR` to create courses
 - [x] Save new courses with initial `DRAFT` status
 - [x] Return `201 Created` and `Location` header from course create API
-- [ ] Remove temporary `/classes/test` endpoint
+- [x] Remove temporary `/classes/test` endpoint
 - [x] Implement course status change API
 - [x] Implement course list API with optional `status` filter
 - [x] Implement course detail API
-- [ ] Return current active enrollment count from course detail
+- [x] Return current active enrollment count from course detail
 - [x] Allow only `CREATOR` to change course status
 - [x] Enforce `DRAFT -> OPEN -> CLOSED` only
 - [x] Reject all other transitions explicitly
@@ -57,44 +56,45 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 
 ## 4. Enrollment flow
 
-- [ ] Implement enrollment create API
-- [ ] Implement enrollment confirm API
-- [ ] Implement enrollment cancel API
-- [ ] Implement my enrollments API
-- [ ] Add enrollment request/response DTOs
-- [ ] Keep payment confirmation simplified as an internal status change, without external payment integration
-- [ ] Start every new enrollment as `PENDING`
-- [ ] Treat `PENDING` and `CONFIRMED` as active enrollments
-- [ ] Use the same active-enrollment definition everywhere: `PENDING + CONFIRMED`
-- [ ] Reject enrollments when course is not `OPEN`
-- [ ] Reject duplicate active enrollment for the same student and course
-- [ ] Perform duplicate check before capacity check to fail fast
-- [ ] Treat duplicate enrollment attempts as effectively idempotent through DB constraint protection
-- [ ] Validate that only the owner of the enrollment can confirm or cancel it
-- [ ] Make `CANCELLED` terminal
+- [x] Implement enrollment create API
+- [x] Implement enrollment confirm API
+- [x] Implement enrollment cancel API
+- [x] Implement my enrollments API
+- [x] Add enrollment request/response DTOs
+- [x] Keep payment confirmation simplified as an internal status change, without external payment integration
+- [x] Start every new enrollment as `PENDING`
+- [x] Treat `PENDING` and `CONFIRMED` as active enrollments
+- [x] Use the same active-enrollment definition everywhere: `PENDING + CONFIRMED`
+- [x] Reject enrollments when course is not `OPEN`
+- [x] Reject duplicate active enrollment for the same student and course
+- [x] Perform duplicate check before capacity check to fail fast
+- [x] Treat duplicate enrollment attempts as effectively idempotent through DB constraint protection
+- [x] Allow only `CREATOR` to confirm enrollments
+- [x] Allow only the owner student or a creator to cancel enrollments
+- [x] Make `CANCELLED` terminal
 
 ## 5. Concurrency and transaction safety
 
-- [ ] Wrap enrollment creation in one transaction
-- [ ] Ensure course load, duplicate check, capacity check, and insert all happen inside the same transaction boundary
-- [ ] Load course with `PESSIMISTIC_WRITE` during enrollment creation
-- [ ] Ensure all reads used for enrollment creation happen after the course lock is acquired
-- [ ] Re-check course status after the row lock is acquired
-- [ ] Assume PostgreSQL default isolation level (`READ COMMITTED`)
-- [ ] Rely on row-level locking for correctness under that isolation level
-- [ ] Rely on the course row lock for capacity consistency, and the DB unique constraint for duplicate protection
+- [x] Wrap enrollment creation in one transaction
+- [x] Ensure course load, duplicate check, capacity check, and insert all happen inside the same transaction boundary
+- [x] Load course with `PESSIMISTIC_WRITE` during enrollment creation
+- [x] Ensure all reads used for enrollment creation happen after the course lock is acquired
+- [x] Re-check course status after the row lock is acquired
+- [x] Assume PostgreSQL default isolation level (`READ COMMITTED`)
+- [x] Rely on row-level locking for correctness under that isolation level
+- [x] Rely on the course row lock for capacity consistency, and the DB unique constraint for duplicate protection
 - [ ] Consider lock wait timeout behavior so enrollment requests do not block forever
-- [ ] Count active enrollments inside the locked transaction
-- [ ] Ensure the count query explicitly filters only active statuses: `PENDING`, `CONFIRMED`
-- [ ] Reject enrollment when active count has reached capacity
-- [ ] Insert `PENDING` enrollment inside the same transaction
-- [ ] Ensure flush happens before commit when relying on DB constraints
-- [ ] Ensure JPA queries inside the same transaction see the latest state
-- [ ] Wrap confirm and cancel in their own transactions
-- [ ] Load enrollment with `PESSIMISTIC_WRITE` for confirm and cancel
-- [ ] Ensure only one state transition can succeed per enrollment under concurrent requests
+- [x] Count active enrollments inside the locked transaction
+- [x] Ensure the count query explicitly filters only active statuses: `PENDING`, `CONFIRMED`
+- [x] Reject enrollment when active count has reached capacity
+- [x] Insert `PENDING` enrollment inside the same transaction
+- [x] Ensure flush happens before commit when relying on DB constraints
+- [x] Ensure JPA queries inside the same transaction see the latest state
+- [x] Wrap confirm and cancel in their own transactions
+- [x] Load enrollment with `PESSIMISTIC_WRITE` for confirm and cancel
+- [x] Ensure only one state transition can succeed per enrollment under concurrent requests
 - [ ] Convert unique-constraint violations to `DUPLICATE_ENROLLMENT`
-- [ ] Treat the service-level duplicate check as a fast-fail optimization; the database is the final source of truth
+- [x] Treat the service-level duplicate check as a fast-fail optimization; the database is the final source of truth
 
 ## 6. Error handling
 
@@ -104,7 +104,7 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Reject missing or invalid auth headers with `UNAUTHORIZED`
 - [x] Enable `DataIntegrityViolationException` mapping
 - [x] Add catch-all unexpected exception mapping
-- [ ] Use `COURSE_NOT_OPEN` for both `DRAFT` and `CLOSED`
+- [x] Use `COURSE_NOT_OPEN` for both `DRAFT` and `CLOSED`
 - [x] Return consistent errors for invalid state transitions
 - [x] Return `FORBIDDEN` for role or ownership failures
 - [x] Return `NOT_FOUND` for missing course or enrollment
@@ -115,37 +115,37 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 
 - [x] Keep Testcontainers PostgreSQL integration support in place
 - [x] Keep the current smoke test passing
-- [ ] Replace the placeholder `contextLoads` test with BE-A integration tests
-- [ ] Test course creation success
-- [ ] Test invalid course status transition
-- [ ] Test enrollment rejected for `DRAFT` or `CLOSED`
-- [ ] Test duplicate active enrollment rejection
-- [ ] Test capacity full rejection
-- [ ] Test confirm and cancel state rules
+- [x] Replace the placeholder `contextLoads` test with BE-A integration tests
+- [x] Test course creation success
+- [x] Test invalid course status transition
+- [x] Test enrollment rejected for `DRAFT` or `CLOSED`
+- [x] Test duplicate active enrollment rejection
+- [x] Test capacity full rejection
+- [x] Test confirm and cancel state rules
 - [ ] Test last-seat race: exactly one request succeeds and the others fail with `COURSE_FULL`
 - [ ] Test same-student double submit: only one active enrollment is created
 - [ ] Test confirm vs cancel race on the same enrollment: only one state change succeeds
 - [ ] Use real multi-threaded execution to simulate concurrency
 - [ ] Use a latch or barrier to align concurrent start timing in race-condition tests
-- [ ] Keep test focus on integration tests, not a big controller test suite
+- [x] Keep test focus on integration tests, not a big controller test suite
 
 ## 8. README
 
 - [ ] Replace the placeholder README with the required assignment sections
-- [ ] Add project overview
-- [ ] Add tech stack
-- [ ] Add local run instructions
-- [ ] Add Docker-based run instructions for the database dependency
+- [x] Add project overview
+- [x] Add tech stack
+- [x] Add local run instructions
+- [x] Add Docker-based run instructions for the database dependency
 - [ ] Add test run instructions
-- [ ] Add requirement interpretation and assumptions
+- [x] Add requirement interpretation and assumptions
 - [ ] Add API list and sample requests/responses
 - [ ] Add a short concurrency design summary
 - [ ] Include one concrete race scenario example
-- [ ] Add data model description plus DB schema or ERD explanation
-- [ ] Add design decisions and reasons
+- [x] Add data model description plus DB schema or ERD explanation
+- [x] Add design decisions and reasons
 - [ ] Add trade-offs
 - [ ] Add AI usage scope
-- [ ] Add unimplemented items and constraints
+- [x] Add unimplemented items and constraints
 
 ## 9. Product-level edge cases
 
