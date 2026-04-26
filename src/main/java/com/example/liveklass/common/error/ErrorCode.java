@@ -16,7 +16,8 @@ public enum ErrorCode {
     // ENROLLMENT 관련 에러
     DUPLICATE_ENROLLMENT(HttpStatus.CONFLICT, "Active enrollment already exists."),
     COURSE_NOT_OPEN(HttpStatus.CONFLICT, "Course is not open for enrollment."),
-    COURSE_FULL(HttpStatus.CONFLICT, "Course capacity has been reached.");
+    COURSE_FULL(HttpStatus.CONFLICT, "Course capacity has been reached."),
+    LOCK_TIMEOUT(HttpStatus.CONFLICT, "Could not acquire lock; please retry.");
 
     private final HttpStatus httpStatus;
     private final String defaultMessage;

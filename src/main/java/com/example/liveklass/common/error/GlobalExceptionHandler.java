@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -61,6 +62,18 @@ public class GlobalExceptionHandler {
                                 .body(ErrorResponse.of(
                                                 ErrorCode.BAD_REQUEST,
                                                 "Database constraint violation.",
+                                                request.getRequestURI()));
+        }
+
+        @ExceptionHandler(PessimisticLockingFailureException.class)
+        public ResponseEntity<ErrorResponse> handleLockTimeout(
+                        PessimisticLockingFailureException exception,
+                        HttpServletRequest request) {
+                return ResponseEntity
+                                .status(ErrorCode.LOCK_TIMEOUT.getHttpStatus())
+                                .body(ErrorResponse.of(
+                                                ErrorCode.LOCK_TIMEOUT,
+                                                ErrorCode.LOCK_TIMEOUT.getDefaultMessage(),
                                                 request.getRequestURI()));
         }
 
