@@ -114,6 +114,15 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         return toResponse(enrollment);
     }
 
+    @Override
+    public List<EnrollmentResponse> getMyEnrollments(RequestUser requestUser) {
+        return enrollmentRepository
+                .findByStudentIdOrderByRequestedAtDesc(requestUser.userId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     private void assertStudent(RequestUser requestUser) {
         if (requestUser.role() != UserRole.STUDENT) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Student role is required.");
