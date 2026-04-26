@@ -6,6 +6,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +19,7 @@ import com.example.liveklass.common.config.RequestUser;
 import com.example.liveklass.course.dto.CourseDetailResponse;
 import com.example.liveklass.course.dto.CourseSummaryResponse;
 import com.example.liveklass.course.dto.CreateCourseRequest;
+import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.service.CourseService;
 
@@ -56,6 +58,15 @@ public class CourseController {
     @GetMapping("/{courseId}")
     public ResponseEntity<CourseDetailResponse> getCourse(@PathVariable Long courseId) {
         return ResponseEntity.ok(courseService.getCourse(courseId));
+    }
+
+    // Course 상태 업데이트
+    @PatchMapping("/{courseId}/status")
+    public ResponseEntity<CourseDetailResponse> updateCourseStatus(
+            @CurrentUser RequestUser requestUser,
+            @PathVariable Long courseId,
+            @Valid @RequestBody UpdateCourseStatusRequest request) {
+        return ResponseEntity.ok(courseService.updateCourseStatus(requestUser, courseId, request));
     }
 
     @GetMapping("/test")
