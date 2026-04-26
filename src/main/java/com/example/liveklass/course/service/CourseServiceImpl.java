@@ -1,5 +1,7 @@
 package com.example.liveklass.course.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -8,6 +10,7 @@ import com.example.liveklass.common.config.UserRole;
 import com.example.liveklass.common.error.BusinessException;
 import com.example.liveklass.common.error.ErrorCode;
 import com.example.liveklass.course.dto.CourseDetailResponse;
+import com.example.liveklass.course.dto.CourseSummaryResponse;
 import com.example.liveklass.course.dto.CreateCourseRequest;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
@@ -49,6 +52,30 @@ public class CourseServiceImpl implements CourseService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
 
         return toDetailResponse(course, 0L);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseSummaryResponse> getCourses(CourseStatus status) {
+        List<Course> courses;
+
+        if (status != null) {
+            courses = courseRepository.findByStatus(status);
+        } else {
+            courses = courseRepository.findAll();
+        }
+
+        return courses.stream()
+                .map(c -> new CourseSummaryResponse(
+                        c.getId(),
+                        c.getTitle(),
+                        c.getDescription(),
+                        c.getPrice(),
+                        c.getCapacity(),
+                        c.getStartDate(),
+                        c.getEndDate(),
+                        c.getStatus()))
+                .toList();
     }
 
     private void assertCreator(RequestUser requestUser) {
