@@ -73,9 +73,33 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     }
 
+    @Override
+    @Transactional
+    public EnrollmentResponse confirmEnrollment(RequestUser requestUser, Long enrollmentId) {
+        assertCreator(requestUser);
+
+        Enrollment enrollment = enrollmentRepository.findByIdForUpdate(enrollmentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Enrollment not found."));
+
+        if (enrollment.getStatus() != EnrollmentStatus.PENDING) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_STATE_TRANSITION,
+                    "Only PENDING enrollments can be confirmed.");
+        }
+
+        enrollment.setStatus(EnrollmentStatus.CONFIRMED);
+        return toResponse(enrollment);
+    }
+
     private void assertStudent(RequestUser requestUser) {
         if (requestUser.role() != UserRole.STUDENT) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Student role is required.");
+        }
+    }
+
+    private void assertCreator(RequestUser requestUser) {
+        if (requestUser.role() != UserRole.CREATOR) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Creator role is required.");
         }
     }
 
