@@ -1,9 +1,10 @@
 package com.example.liveklass.enrollment.controller;
 
-import java.util.List;
-
 import jakarta.validation.Valid;
 
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import com.example.liveklass.common.config.CurrentUser;
 import com.example.liveklass.common.config.RequestUser;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedEnrollmentResponse;
 import com.example.liveklass.enrollment.service.EnrollmentService;
 
 @Validated
@@ -58,8 +60,9 @@ public class EnrollmentController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<List<EnrollmentResponse>> getMyEnrollments(
-            @CurrentUser RequestUser requestUser) {
-        return ResponseEntity.ok(enrollmentService.getMyEnrollments(requestUser));
+    public ResponseEntity<PagedEnrollmentResponse> getMyEnrollments(
+            @CurrentUser RequestUser requestUser,
+            @PageableDefault(size = 20, sort = "requestedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(enrollmentService.getMyEnrollments(requestUser, pageable));
     }
 }
