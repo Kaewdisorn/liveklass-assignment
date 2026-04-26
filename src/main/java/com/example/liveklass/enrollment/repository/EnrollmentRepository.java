@@ -32,4 +32,6 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from Enrollment e where e.id = :enrollmentId")
     Optional<Enrollment> findByIdForUpdate(@Param("enrollmentId") Long enrollmentId);
+
+    Page<Enrollment> findByCourseIdOrderByRequestedAtDesc(Long courseId, Pageable pageable);
 }
