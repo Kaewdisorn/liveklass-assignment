@@ -45,6 +45,17 @@ public class GlobalExceptionHandler {
         public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
                         DataIntegrityViolationException exception,
                         HttpServletRequest request) {
+                String msg = exception.getMostSpecificCause().getMessage();
+
+                if (msg != null && msg.contains("uq_enrollment_active_per_student_course")) {
+                        return ResponseEntity
+                                        .status(ErrorCode.DUPLICATE_ENROLLMENT.getHttpStatus())
+                                        .body(ErrorResponse.of(
+                                                        ErrorCode.DUPLICATE_ENROLLMENT,
+                                                        ErrorCode.DUPLICATE_ENROLLMENT.getDefaultMessage(),
+                                                        request.getRequestURI()));
+                }
+
                 return ResponseEntity
                                 .status(ErrorCode.BAD_REQUEST.getHttpStatus())
                                 .body(ErrorResponse.of(
