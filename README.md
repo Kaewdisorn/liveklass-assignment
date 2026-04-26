@@ -36,7 +36,7 @@ curl http://localhost:8080/classes
 - 수강 신청 생성 — `OPEN` 상태의 강의에 한해 `STUDENT`가 신청할 수 있습니다. 정원 초과·중복 신청은 즉시 거부됩니다.
 - 수강 신청 확정 — 해당 강의의 소유 `CREATOR`만 `PENDING` → `CONFIRMED`로 바꿀 수 있습니다.
 - 수강 신청 취소 — 신청자 본인 또는 해당 강의의 `CREATOR`가 취소할 수 있습니다.
-- 내 신청 목록 조회 — 로그인한 사용자의 전체 신청 이력을 최신순으로 반환합니다.
+- 내 신청 목록 조회 — 로그인한 사용자의 전체 신청 이력을 최신순으로 반환합니다. `page`/`size` 쿼리 파라미터로 페이지네이션을 지원합니다(기본값: `page=0`, `size=20`).
 
 ### 동시성 안전성
 
@@ -108,7 +108,7 @@ src/main/java/com/example/liveklass/
 │   └── service/CourseService.java + CourseServiceImpl.java
 └── enrollment/
     ├── controller/EnrollmentController.java
-    ├── dto/                          # CreateEnrollmentRequest, EnrollmentResponse
+    ├── dto/                          # CreateEnrollmentRequest, EnrollmentResponse, PagedEnrollmentResponse
     ├── entity/Enrollment.java
     ├── enums/EnrollmentStatus.java   # PENDING / CONFIRMED / CANCELLED
     ├── repository/EnrollmentRepository.java
@@ -220,12 +220,12 @@ Windows PowerShell:
 
 ### 수강 신청 API
 
-| 메서드 | 경로                                  | 권한                       | 설명                   |
-| ------ | ------------------------------------- | -------------------------- | ---------------------- |
-| `POST` | `/enrollments`                        | `STUDENT`                  | 수강 신청 생성         |
-| `POST` | `/enrollments/{enrollmentId}/confirm` | `CREATOR`                  | 수강 신청 확정         |
-| `POST` | `/enrollments/{enrollmentId}/cancel`  | 신청자 본인 또는 `CREATOR` | 수강 신청 취소         |
-| `GET`  | `/enrollments/me`                     | 인증 필요                  | 내 수강 신청 목록 조회 |
+| 메서드 | 경로                                  | 권한                       | 설명                                       |
+| ------ | ------------------------------------- | -------------------------- | ------------------------------------------ |
+| `POST` | `/enrollments`                        | `STUDENT`                  | 수강 신청 생성                             |
+| `POST` | `/enrollments/{enrollmentId}/confirm` | `CREATOR`                  | 수강 신청 확정                             |
+| `POST` | `/enrollments/{enrollmentId}/cancel`  | 신청자 본인 또는 `CREATOR` | 수강 신청 취소                             |
+| `GET`  | `/enrollments/me`                     | 인증 필요                  | 내 수강 신청 목록 조회 (`?page=0&size=20`) |
 
 ## 요청/응답 예시
 
@@ -381,7 +381,7 @@ X-User-Role: STUDENT
 요청:
 
 ```http
-GET /enrollments/me
+GET /enrollments/me?page=0&size=20
 X-User-Id: 10
 X-User-Role: STUDENT
 ```
@@ -389,16 +389,23 @@ X-User-Role: STUDENT
 응답:
 
 ```json
-[
-  {
-    "enrollmentId": 100,
-    "courseId": 1,
-    "studentId": 10,
-    "status": "CONFIRMED",
-    "requestedAt": "2026-04-27T01:05:00Z",
-    "updatedAt": "2026-04-27T01:06:00Z"
-  }
-]
+{
+  "content": [
+    {
+      "enrollmentId": 100,
+      "courseId": 1,
+      "studentId": 10,
+      "status": "CONFIRMED",
+      "requestedAt": "2026-04-27T01:05:00Z",
+      "updatedAt": "2026-04-27T01:06:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1,
+  "last": true
+}
 ```
 
 ## 에러 응답 형식
@@ -530,7 +537,6 @@ X-User-Role: STUDENT
 ## 미구현 또는 범위 밖 항목
 
 - 대기열(waitlist)
-- 수강 신청 목록 페이지네이션
 - 강의별 수강생 목록 조회
 - 실제 인증/인가 인프라
 - 외부 결제 연동
