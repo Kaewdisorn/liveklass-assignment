@@ -39,9 +39,6 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     public EnrollmentResponse createEnrollment(RequestUser requestUser, CreateEnrollmentRequest request) {
         assertStudent(requestUser);
 
-        System.out.println(
-                "Creating enrollment for userId: " + requestUser.userId() + ", courseId: " + request.courseId());
-
         Course course = courseRepository.findByIdForUpdate(request.courseId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
 
