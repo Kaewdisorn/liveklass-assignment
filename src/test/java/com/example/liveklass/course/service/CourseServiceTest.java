@@ -31,9 +31,13 @@ import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
+import com.example.liveklass.enrollment.repository.EnrollmentRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("CourseService 단위 테스트")
@@ -41,6 +45,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseRepository courseRepository;
+
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
 
     private CourseServiceImpl courseService;
 
@@ -77,7 +84,8 @@ class CourseServiceTest {
 
     @BeforeEach
     void setUp() {
-        courseService = new CourseServiceImpl(courseRepository, null);
+        lenient().when(enrollmentRepository.countByCourseIdAndStatusIn(anyLong(), anyCollection())).thenReturn(0L);
+        courseService = new CourseServiceImpl(courseRepository, enrollmentRepository);
     }
 
     // =========================
