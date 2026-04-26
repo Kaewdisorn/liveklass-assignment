@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,9 @@ import com.example.liveklass.common.config.UserRole;
 import com.example.liveklass.common.error.BusinessException;
 import com.example.liveklass.common.error.ErrorCode;
 import com.example.liveklass.course.dto.CourseDetailResponse;
+import com.example.liveklass.course.dto.CourseSummaryResponse;
 import com.example.liveklass.course.dto.CreateCourseRequest;
+import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
@@ -53,6 +56,23 @@ class CourseServiceTest {
                 5,
                 START_DATE,
                 END_DATE);
+    }
+
+    private Course buildCourse(Long id, String title, CourseStatus status) {
+        Course course = new Course();
+        course.setId(id);
+        course.setCreatorId(CREATOR.userId());
+        course.setTitle(title);
+        course.setDescription("desc");
+        course.setPrice(new BigDecimal("50.00"));
+        course.setCapacity(5);
+        course.setStartDate(START_DATE);
+        course.setEndDate(END_DATE);
+        course.setStatus(status);
+        OffsetDateTime now = OffsetDateTime.now();
+        course.setCreatedAt(now);
+        course.setUpdatedAt(now);
+        return course;
     }
 
     @BeforeEach
@@ -159,6 +179,112 @@ class CourseServiceTest {
             assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND);
 
             verify(courseRepository).findById(99L);
+        }
+    }
+
+    // =========================
+    // getCourses
+    // =========================
+    @Nested
+    @DisplayName("getCourses()")
+    class GetCourses {
+
+        @Test
+        @DisplayName("status=null 시 전체 코스 목록 반환")
+        void getCourses_withNullStatus_returnsAll() {
+            Course c1 = buildCourse(1L, "Math 101", CourseStatus.DRAFT);
+            Course c2 = buildCourse(2L, "Science 101", CourseStatus.OPEN);
+            when(courseRepository.findAll()).thenReturn(List.of(c1, c2));
+
+            List<CourseSummaryResponse> result = courseService.getCourses(null);
+
+            assertThat(result).hasSize(2);
+            verify(courseRepository).findAll();
+            verify(courseRepository, never()).findByStatus(any());
+        }
+
+        @Test
+        @DisplayName("status 지정 시 해당 상태 코스만 반환")
+        void getCourses_withStatus_returnsFiltered() {
+            Course c1 = buildCourse(1L, "Math 101", CourseStatus.DRAFT);
+            when(courseRepository.findByStatus(CourseStatus.DRAFT)).thenReturn(List.of(c1));
+
+            List<CourseSummaryResponse> result = courseService.getCourses(CourseStatus.DRAFT);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).status()).isEqualTo(CourseStatus.DRAFT);
+            verify(courseRepository).findByStatus(CourseStatus.DRAFT);
+            verify(courseRepository, never()).findAll();
+        }
+    }
+
+    // =========================
+    // updateCourseStatus
+    // =========================
+    @Nested
+    @DisplayName("updateCourseStatus()")
+    class UpdateCourseStatus {
+
+        @Test
+        @DisplayName("DRAFT에서 OPEN으로 상태 전환 성공")
+        void updateCourseStatus_draftToOpen_succeeds() {
+            Course course = buildCourse(1L, "Math 101", CourseStatus.DRAFT);
+            when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+
+            CourseDetailResponse result = courseService.updateCourseStatus(
+                    CREATOR, 1L, new UpdateCourseStatusRequest(CourseStatus.OPEN));
+
+            assertThat(result.status()).isEqualTo(CourseStatus.OPEN);
+        }
+
+        @Test
+        @DisplayName("OPEN에서 CLOSED로 상태 전환 성공")
+        void updateCourseStatus_openToClosed_succeeds() {
+            Course course = buildCourse(1L, "Math 101", CourseStatus.OPEN);
+            when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+
+            CourseDetailResponse result = courseService.updateCourseStatus(
+                    CREATOR, 1L, new UpdateCourseStatusRequest(CourseStatus.CLOSED));
+
+            assertThat(result.status()).isEqualTo(CourseStatus.CLOSED);
+        }
+
+        @Test
+        @DisplayName("DRAFT에서 CLOSED로 잘못된 상태 전환 시 예외 발생")
+        void updateCourseStatus_invalidTransition_throws() {
+            Course course = buildCourse(1L, "Math 101", CourseStatus.DRAFT);
+            when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> courseService.updateCourseStatus(
+                            CREATOR, 1L, new UpdateCourseStatusRequest(CourseStatus.CLOSED)));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+        }
+
+        @Test
+        @DisplayName("STUDENT 역할로 상태 변경 시 FORBIDDEN 예외 발생")
+        void updateCourseStatus_asStudent_throws() {
+            RequestUser student = new RequestUser(456L, UserRole.STUDENT);
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> courseService.updateCourseStatus(
+                            student, 1L, new UpdateCourseStatusRequest(CourseStatus.OPEN)));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+            verify(courseRepository, never()).findById(any());
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 courseId로 상태 변경 시 NOT_FOUND 예외 발생")
+        void updateCourseStatus_courseNotFound_throws() {
+            when(courseRepository.findById(99L)).thenReturn(Optional.empty());
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> courseService.updateCourseStatus(
+                            CREATOR, 99L, new UpdateCourseStatusRequest(CourseStatus.OPEN)));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND);
         }
     }
 
