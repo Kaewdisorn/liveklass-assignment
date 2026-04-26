@@ -65,6 +65,9 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
             .registerModule(new JavaTimeModule())
             .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
+    private record HttpResult(int status, String body) {
+    }
+
     @BeforeEach
     void setUp() {
         enrollmentRepository.deleteAll();
@@ -77,16 +80,24 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
         int threads = 10;
         Long courseId = createOpenCourse(1).courseId();
 
-        List<Callable<Integer>> requests = new ArrayList<>();
+        List<Callable<HttpResult>> requests = new ArrayList<>();
         for (int index = 0; index < threads; index++) {
             String studentId = String.valueOf(100 + index);
             requests.add(() -> enroll(studentId, courseId));
         }
 
-        List<Integer> statuses = runConcurrently(requests);
+        List<HttpResult> results = runConcurrently(requests);
 
-        assertThat(statuses).filteredOn(status -> status == HTTP_OK).hasSize(1);
-        assertThat(statuses).filteredOn(status -> status == HTTP_CONFLICT).hasSize(threads - 1);
+        assertThat(results).filteredOn(r -> r.status() == HTTP_OK).hasSize(1);
+
+        List<HttpResult> failures = results.stream()
+                .filter(r -> r.status() == HTTP_CONFLICT)
+                .toList();
+        assertThat(failures).hasSize(threads - 1);
+        for (HttpResult failure : failures) {
+            assertThat(errorCode(failure.body())).isEqualTo("COURSE_FULL");
+        }
+
         assertThat(enrollmentRepository.count()).isEqualTo(1);
     }
 
@@ -97,15 +108,24 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
         Long courseId = createOpenCourse(10).courseId();
         String studentId = "200";
 
-        List<Callable<Integer>> requests = new ArrayList<>();
+        List<Callable<HttpResult>> requests = new ArrayList<>();
         for (int index = 0; index < threads; index++) {
             requests.add(() -> enroll(studentId, courseId));
         }
 
-        List<Integer> statuses = runConcurrently(requests);
+        List<HttpResult> results = runConcurrently(requests);
 
-        assertThat(statuses).filteredOn(status -> status == HTTP_OK).hasSize(1);
-        assertThat(statuses).filteredOn(status -> status == HTTP_CONFLICT).hasSize(threads - 1);
+        assertThat(results).filteredOn(r -> r.status() == HTTP_OK).hasSize(1);
+
+        List<HttpResult> failures = results.stream()
+                .filter(r -> r.status() == HTTP_CONFLICT)
+                .toList();
+        assertThat(failures).hasSize(threads - 1);
+        for (HttpResult failure : failures) {
+            assertThat(errorCode(failure.body()))
+                    .isIn("DUPLICATE_ENROLLMENT");
+        }
+
         assertThat(enrollmentRepository.count()).isEqualTo(1);
     }
 
@@ -117,13 +137,18 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
 
         EnrollmentResponse createdEnrollment = createEnrollment(studentId, courseId);
 
-        List<Integer> statuses = runConcurrently(List.of(
+        List<HttpResult> results = runConcurrently(List.of(
                 () -> confirm(createdEnrollment.enrollmentId()),
                 () -> cancel(studentId, createdEnrollment.enrollmentId())));
 
-        assertThat(statuses).hasSize(2);
-        assertThat(statuses).allMatch(status -> status == HTTP_OK || status == HTTP_CONFLICT);
-        assertThat(statuses).filteredOn(status -> status == HTTP_OK).isNotEmpty();
+        assertThat(results).hasSize(2);
+        assertThat(results).filteredOn(r -> r.status() == HTTP_OK).hasSize(1);
+
+        List<HttpResult> failures = results.stream()
+                .filter(r -> r.status() == HTTP_CONFLICT)
+                .toList();
+        assertThat(failures).hasSize(1);
+        assertThat(errorCode(failures.get(0).body())).isEqualTo("INVALID_STATE_TRANSITION");
 
         Enrollment finalEnrollment = enrollmentRepository.findById(createdEnrollment.enrollmentId()).orElseThrow();
         assertThat(finalEnrollment.getStatus()).isIn(EnrollmentStatus.CONFIRMED, EnrollmentStatus.CANCELLED);
@@ -173,40 +198,43 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
         return objectMapper.readValue(result.getResponse().getContentAsString(), EnrollmentResponse.class);
     }
 
-    private int enroll(String studentId, Long courseId) throws Exception {
+    private HttpResult enroll(String studentId, Long courseId) throws Exception {
         MvcResult result = mockMvc.perform(post("/enrollments")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(toJson(new CreateEnrollmentRequest(courseId)))
                 .header("X-User-Id", studentId)
                 .header("X-User-Role", STUDENT_ROLE))
                 .andReturn();
-        return result.getResponse().getStatus();
+        return new HttpResult(result.getResponse().getStatus(),
+                result.getResponse().getContentAsString());
     }
 
-    private int confirm(Long enrollmentId) throws Exception {
+    private HttpResult confirm(Long enrollmentId) throws Exception {
         MvcResult result = mockMvc.perform(post("/enrollments/{enrollmentId}/confirm", enrollmentId)
                 .header("X-User-Id", CREATOR_ID)
                 .header("X-User-Role", CREATOR_ROLE))
                 .andReturn();
-        return result.getResponse().getStatus();
+        return new HttpResult(result.getResponse().getStatus(),
+                result.getResponse().getContentAsString());
     }
 
-    private int cancel(String studentId, Long enrollmentId) throws Exception {
+    private HttpResult cancel(String studentId, Long enrollmentId) throws Exception {
         MvcResult result = mockMvc.perform(post("/enrollments/{enrollmentId}/cancel", enrollmentId)
                 .header("X-User-Id", studentId)
                 .header("X-User-Role", STUDENT_ROLE))
                 .andReturn();
-        return result.getResponse().getStatus();
+        return new HttpResult(result.getResponse().getStatus(),
+                result.getResponse().getContentAsString());
     }
 
-    private List<Integer> runConcurrently(List<Callable<Integer>> requests) throws Exception {
+    private List<HttpResult> runConcurrently(List<Callable<HttpResult>> requests) throws Exception {
         CountDownLatch ready = new CountDownLatch(requests.size());
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService executorService = Executors.newFixedThreadPool(requests.size());
 
         try {
-            List<Future<Integer>> futures = new ArrayList<>();
-            for (Callable<Integer> request : requests) {
+            List<Future<HttpResult>> futures = new ArrayList<>();
+            for (Callable<HttpResult> request : requests) {
                 futures.add(executorService.submit(() -> {
                     ready.countDown();
                     start.await();
@@ -217,17 +245,17 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
             ready.await();
             start.countDown();
 
-            List<Integer> statuses = new ArrayList<>();
-            for (Future<Integer> future : futures) {
-                statuses.add(getFutureValue(future));
+            List<HttpResult> results = new ArrayList<>();
+            for (Future<HttpResult> future : futures) {
+                results.add(getFutureValue(future));
             }
-            return statuses;
+            return results;
         } finally {
             executorService.shutdownNow();
         }
     }
 
-    private Integer getFutureValue(Future<Integer> future) throws Exception {
+    private HttpResult getFutureValue(Future<HttpResult> future) throws Exception {
         try {
             return future.get();
         } catch (ExecutionException exception) {
@@ -237,6 +265,12 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
             }
             throw exception;
         }
+    }
+
+    private String errorCode(String body) throws Exception {
+        if (body == null || body.isBlank())
+            return null;
+        return objectMapper.readTree(body).path("code").asText(null);
     }
 
     private String toJson(Object value) throws Exception {
