@@ -264,6 +264,19 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
             mockMvc.perform(post("/enrollments/" + enrollment.enrollmentId() + "/confirm"))
                     .andExpect(status().isUnauthorized());
         }
+
+        @Test
+        @DisplayName("다른 크리에이터가 승인 요청 시 403 반환")
+        void confirmEnrollment_byDifferentCreator_returns403() throws Exception {
+            Long courseId = openCourse(10);
+            EnrollmentResponse enrollment = enrollViaHttp(STUDENT1_ID, courseId);
+
+            mockMvc.perform(post("/enrollments/" + enrollment.enrollmentId() + "/confirm")
+                    .header("X-User-Id", "999")
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
     }
 
     // =========================

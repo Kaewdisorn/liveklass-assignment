@@ -206,7 +206,9 @@ class EnrollmentServiceTest {
         @DisplayName("CREATOR가 PENDING 신청 승인 시 CONFIRMED 상태 반환")
         void confirmEnrollment_success() {
             Enrollment enrollment = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.PENDING);
+            Course course = buildOpenCourse(5L, 10);
             when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(enrollment));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
 
             EnrollmentResponse result = enrollmentService.confirmEnrollment(CREATOR, 100L);
 
@@ -239,7 +241,9 @@ class EnrollmentServiceTest {
         @DisplayName("PENDING 아닌 신청 승인 시 INVALID_STATE_TRANSITION 예외 발생")
         void confirmEnrollment_alreadyConfirmed_throwsInvalidStateTransition() {
             Enrollment enrollment = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            Course course = buildOpenCourse(5L, 10);
             when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(enrollment));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
 
             BusinessException ex = assertThrows(BusinessException.class,
                     () -> enrollmentService.confirmEnrollment(CREATOR, 100L));
@@ -251,12 +255,29 @@ class EnrollmentServiceTest {
         @DisplayName("CANCELLED 신청 승인 시 INVALID_STATE_TRANSITION 예외 발생")
         void confirmEnrollment_cancelled_throwsInvalidStateTransition() {
             Enrollment enrollment = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CANCELLED);
+            Course course = buildOpenCourse(5L, 10);
             when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(enrollment));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
 
             BusinessException ex = assertThrows(BusinessException.class,
                     () -> enrollmentService.confirmEnrollment(CREATOR, 100L));
 
             assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+        }
+
+        @Test
+        @DisplayName("다른 크리에이터가 승인 시 FORBIDDEN 예외 발생")
+        void confirmEnrollment_byOtherCreator_throwsForbidden() {
+            RequestUser otherCreator = new RequestUser(999L, UserRole.CREATOR);
+            Enrollment enrollment = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.PENDING);
+            Course course = buildOpenCourse(5L, 10); // creatorId = CREATOR.userId() = 1L
+            when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(enrollment));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> enrollmentService.confirmEnrollment(otherCreator, 100L));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
         }
     }
 

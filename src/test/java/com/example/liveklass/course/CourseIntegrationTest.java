@@ -307,5 +307,18 @@ class CourseIntegrationTest extends IntegrationTestSupport {
                     .content(toJson(new UpdateCourseStatusRequest(CourseStatus.OPEN))))
                     .andExpect(status().isUnauthorized());
         }
+
+        @Test
+        @DisplayName("다른 크리에이터가 상태 변경 시 403 반환")
+        void updateStatus_byDifferentCreator_returns403() throws Exception {
+            CourseDetailResponse created = createCourseViaHttp("Math 101");
+            mockMvc.perform(patch("/classes/" + created.courseId() + "/status")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(toJson(new UpdateCourseStatusRequest(CourseStatus.OPEN)))
+                    .header("X-User-Id", "999")
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
     }
 }

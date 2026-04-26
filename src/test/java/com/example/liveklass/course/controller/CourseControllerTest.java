@@ -406,6 +406,23 @@ class CourseControllerTest {
                 }
 
                 @Test
+                @DisplayName("코스 소유자가 아닌 크리에이터 상태 변경 시 403 Forbidden 반환")
+                void updateCourseStatus_byNonOwnerCreator_returns403() throws Exception {
+                        when(courseService.updateCourseStatus(any(), eq(1L), any()))
+                                        .thenThrow(new BusinessException(ErrorCode.FORBIDDEN,
+                                                        "Only the course creator can change the status."));
+
+                        mockMvc.perform(patchWithUserHeaders("/classes/1/status",
+                                        new UpdateCourseStatusRequest(CourseStatus.OPEN)))
+                                        .andExpect(status().isForbidden())
+                                        .andExpect(jsonPath("$.code").value(ErrorCode.FORBIDDEN.name()))
+                                        .andExpect(jsonPath("$.message")
+                                                        .value("Only the course creator can change the status."));
+
+                        verify(courseService).updateCourseStatus(any(), eq(1L), any());
+                }
+
+                @Test
                 @DisplayName("status 필드 누락 시 400 Bad Request 반환")
                 void updateCourseStatus_missingStatus_returns400() throws Exception {
                         mockMvc.perform(patch("/classes/1/status")

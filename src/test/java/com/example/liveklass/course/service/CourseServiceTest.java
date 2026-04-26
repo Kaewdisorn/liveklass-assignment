@@ -294,6 +294,20 @@ class CourseServiceTest {
 
             assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND);
         }
+
+        @Test
+        @DisplayName("다른 크리에이터가 상태 변경 시 FORBIDDEN 예외 발생")
+        void updateCourseStatus_byDifferentCreator_throwsForbidden() {
+            Course course = buildCourse(1L, "Math 101", CourseStatus.DRAFT);
+            RequestUser otherCreator = new RequestUser(999L, UserRole.CREATOR);
+            when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> courseService.updateCourseStatus(
+                            otherCreator, 1L, new UpdateCourseStatusRequest(CourseStatus.OPEN)));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+        }
     }
 
 }
