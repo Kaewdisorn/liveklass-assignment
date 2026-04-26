@@ -23,6 +23,7 @@ import com.example.liveklass.course.dto.CreateCourseRequest;
 import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
+import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.repository.EnrollmentRepository;
 import com.example.liveklass.support.IntegrationTestSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -319,6 +320,86 @@ class CourseIntegrationTest extends IntegrationTestSupport {
                     .header("X-User-Role", CREATOR_ROLE))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
+    }
+
+    // ================================================
+    // GET /classes/{courseId}/enrollments
+    // ================================================
+    @Nested
+    @DisplayName("GET /classes/{courseId}/enrollments - 강의별 수강생 목록 조회")
+    class GetCourseEnrollments {
+
+        @Test
+        @DisplayName("시나리오 A: 강의 소유 CREATOR가 수강생 목록 조회 시 해당 신청이 목록에 포함됨")
+        void scenarioA_ownerCreator_seesEnrollment() throws Exception {
+            CourseDetailResponse course = createCourseViaHttp("Enrollment List Test");
+            openCourseViaHttp(course.courseId());
+
+            // 학생 수강 신청
+            mockMvc.perform(post("/enrollments")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(toJson(new CreateEnrollmentRequest(course.courseId())))
+                    .header("X-User-Id", STUDENT_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk());
+
+            // 소유 CREATOR 조회
+            mockMvc.perform(get("/classes/" + course.courseId() + "/enrollments")
+                    .header("X-User-Id", CREATOR_ID)
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].studentId").value(Long.parseLong(STUDENT_ID)))
+                    .andExpect(jsonPath("$.content[0].status").value("PENDING"));
+        }
+
+        @Test
+        @DisplayName("시나리오 B: 다른 CREATOR가 조회 시 403 반환")
+        void scenarioB_differentCreator_returns403() throws Exception {
+            CourseDetailResponse course = createCourseViaHttp("Another Creator Test");
+
+            mockMvc.perform(get("/classes/" + course.courseId() + "/enrollments")
+                    .header("X-User-Id", "999")
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
+
+        @Test
+        @DisplayName("시나리오 C: STUDENT가 조회 시 403 반환")
+        void scenarioC_student_returns403() throws Exception {
+            CourseDetailResponse course = createCourseViaHttp("Student Access Test");
+
+            mockMvc.perform(get("/classes/" + course.courseId() + "/enrollments")
+                    .header("X-User-Id", STUDENT_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
+
+        @Test
+        @DisplayName("시나리오 D: 존재하지 않는 courseId 조회 시 404 반환")
+        void scenarioD_unknownCourse_returns404() throws Exception {
+            mockMvc.perform(get("/classes/9999999/enrollments")
+                    .header("X-User-Id", CREATOR_ID)
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+        }
+
+        @Test
+        @DisplayName("수강 신청이 없는 강의 조회 시 빈 목록 반환")
+        void scenarioE_noneEnrolled_returnsEmptyContent() throws Exception {
+            CourseDetailResponse course = createCourseViaHttp("Empty Course");
+
+            mockMvc.perform(get("/classes/" + course.courseId() + "/enrollments")
+                    .header("X-User-Id", CREATOR_ID)
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(0))
+                    .andExpect(jsonPath("$.content").isArray())
+                    .andExpect(jsonPath("$.content").isEmpty());
         }
     }
 }

@@ -26,6 +26,10 @@ import com.example.liveklass.course.dto.CreateCourseRequest;
 import com.example.liveklass.course.dto.UpdateCourseStatusRequest;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.service.CourseService;
+import com.example.liveklass.enrollment.dto.CourseEnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedCourseEnrollmentResponse;
+import com.example.liveklass.enrollment.enums.EnrollmentStatus;
+import com.example.liveklass.enrollment.service.EnrollmentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +53,9 @@ class CourseControllerTest {
 
         @MockitoBean
         private CourseService courseService;
+
+        @MockitoBean
+        private EnrollmentService enrollmentService;
 
         private static final String USER_ID = "123";
         private static final String USER_ROLE = "CREATOR";
@@ -433,6 +440,98 @@ class CourseControllerTest {
                                         .andExpect(status().isBadRequest());
 
                         verify(courseService, never()).updateCourseStatus(any(), any(), any());
+                }
+        }
+
+        // =========================
+        // GET /classes/{courseId}/enrollments
+        // =========================
+        @Nested
+        @DisplayName("GET /classes/{courseId}/enrollments - 강의별 수강생 목록 조회")
+        class GetCourseEnrollments {
+
+                private PagedCourseEnrollmentResponse buildPagedResponse() {
+                        CourseEnrollmentResponse item = new CourseEnrollmentResponse(
+                                        100L, 10L, EnrollmentStatus.CONFIRMED,
+                                        OffsetDateTime.now(), OffsetDateTime.now());
+                        return new PagedCourseEnrollmentResponse(List.of(item), 0, 20, 1L, 1, true);
+                }
+
+                @Test
+                @DisplayName("강의 소유 CREATOR 요청 시 200 OK와 페이지 응답 반환")
+                void givenCreatorOwner_whenGetEnrollments_thenReturn200() throws Exception {
+                        when(enrollmentService.getCourseEnrollments(any(), eq(1L), any()))
+                                        .thenReturn(buildPagedResponse());
+
+                        mockMvc.perform(get("/classes/1/enrollments")
+                                        .header("X-User-Id", USER_ID)
+                                        .header("X-User-Role", USER_ROLE))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.content[0].enrollmentId").value(100))
+                                        .andExpect(jsonPath("$.content[0].studentId").value(10))
+                                        .andExpect(jsonPath("$.totalElements").value(1));
+
+                        verify(enrollmentService).getCourseEnrollments(any(), eq(1L), any());
+                }
+
+                @Test
+                @DisplayName("STUDENT 역할 요청 시 403 Forbidden 반환")
+                void givenStudentRole_whenGetEnrollments_thenReturn403() throws Exception {
+                        when(enrollmentService.getCourseEnrollments(any(), eq(1L), any()))
+                                        .thenThrow(new BusinessException(ErrorCode.FORBIDDEN,
+                                                        "Creator role is required."));
+
+                        mockMvc.perform(get("/classes/1/enrollments")
+                                        .header("X-User-Id", USER_ID)
+                                        .header("X-User-Role", USER_ROLE))
+                                        .andExpect(status().isForbidden())
+                                        .andExpect(jsonPath("$.code").value(ErrorCode.FORBIDDEN.name()));
+
+                        verify(enrollmentService).getCourseEnrollments(any(), eq(1L), any());
+                }
+
+                @Test
+                @DisplayName("존재하지 않는 강의 조회 시 404 Not Found 반환")
+                void givenUnknownCourse_whenGetEnrollments_thenReturn404() throws Exception {
+                        when(enrollmentService.getCourseEnrollments(any(), eq(99L), any()))
+                                        .thenThrow(new BusinessException(ErrorCode.COURSE_NOT_FOUND,
+                                                        "Course not found."));
+
+                        mockMvc.perform(get("/classes/99/enrollments")
+                                        .header("X-User-Id", USER_ID)
+                                        .header("X-User-Role", USER_ROLE))
+                                        .andExpect(status().isNotFound())
+                                        .andExpect(jsonPath("$.code").value(ErrorCode.COURSE_NOT_FOUND.name()));
+
+                        verify(enrollmentService).getCourseEnrollments(any(), eq(99L), any());
+                }
+
+                @Test
+                @DisplayName("강의 소유자가 아닌 CREATOR 요청 시 403 Forbidden 반환")
+                void givenWrongOwner_whenGetEnrollments_thenReturn403() throws Exception {
+                        when(enrollmentService.getCourseEnrollments(any(), eq(1L), any()))
+                                        .thenThrow(new BusinessException(ErrorCode.FORBIDDEN,
+                                                        "Only the course creator can view enrollments."));
+
+                        mockMvc.perform(get("/classes/1/enrollments")
+                                        .header("X-User-Id", USER_ID)
+                                        .header("X-User-Role", USER_ROLE))
+                                        .andExpect(status().isForbidden())
+                                        .andExpect(jsonPath("$.code").value(ErrorCode.FORBIDDEN.name()))
+                                        .andExpect(jsonPath("$.message")
+                                                        .value("Only the course creator can view enrollments."));
+
+                        verify(enrollmentService).getCourseEnrollments(any(), eq(1L), any());
+                }
+
+                @Test
+                @DisplayName("인증 헤더 누락 시 401 Unauthorized 반환")
+                void givenMissingHeaders_whenGetEnrollments_thenReturn401() throws Exception {
+                        mockMvc.perform(get("/classes/1/enrollments"))
+                                        .andExpect(status().isUnauthorized())
+                                        .andExpect(jsonPath("$.code").value(ErrorCode.UNAUTHORIZED.name()));
+
+                        verify(enrollmentService, never()).getCourseEnrollments(any(), any(), any());
                 }
         }
 

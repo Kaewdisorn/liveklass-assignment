@@ -35,8 +35,10 @@ import com.example.liveklass.common.error.ErrorCode;
 import com.example.liveklass.course.entity.Course;
 import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
+import com.example.liveklass.enrollment.dto.CourseEnrollmentResponse;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedCourseEnrollmentResponse;
 import com.example.liveklass.enrollment.dto.PagedEnrollmentResponse;
 import com.example.liveklass.enrollment.entity.Enrollment;
 import com.example.liveklass.enrollment.enums.EnrollmentStatus;
@@ -399,6 +401,75 @@ class EnrollmentServiceTest {
             assertThat(result.content()).isEmpty();
             assertThat(result.totalElements()).isEqualTo(0);
             verify(enrollmentRepository).findByStudentIdOrderByRequestedAtDesc(STUDENT.userId(), pageable);
+        }
+    }
+
+    // =========================
+    // getCourseEnrollments
+    // =========================
+    @Nested
+    @DisplayName("getCourseEnrollments()")
+    class GetCourseEnrollments {
+
+        @Test
+        @DisplayName("강의 소유 CREATOR 요청 시 페이지 응답 반환 및 필드 매핑 검증")
+        void givenCreatorOwner_whenGetCourseEnrollments_thenReturnPage() {
+            Pageable pageable = PageRequest.of(0, 20);
+            Course course = buildOpenCourse(5L, 10); // creatorId = CREATOR.userId() = 1L
+            Enrollment e = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            Page<Enrollment> page = new PageImpl<>(List.of(e), pageable, 1);
+
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
+            when(enrollmentRepository.findByCourseIdOrderByRequestedAtDesc(5L, pageable)).thenReturn(page);
+
+            PagedCourseEnrollmentResponse result = enrollmentService.getCourseEnrollments(CREATOR, 5L, pageable);
+
+            assertThat(result.totalElements()).isEqualTo(1);
+            assertThat(result.content()).hasSize(1);
+            CourseEnrollmentResponse item = result.content().get(0);
+            assertThat(item.enrollmentId()).isEqualTo(100L);
+            assertThat(item.studentId()).isEqualTo(STUDENT.userId());
+            assertThat(item.status()).isEqualTo(EnrollmentStatus.CONFIRMED);
+
+            verify(enrollmentRepository).findByCourseIdOrderByRequestedAtDesc(5L, pageable);
+        }
+
+        @Test
+        @DisplayName("STUDENT 역할 요청 시 FORBIDDEN 예외 발생")
+        void givenStudentRole_whenGetCourseEnrollments_thenThrowForbidden() {
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> enrollmentService.getCourseEnrollments(STUDENT, 5L, PageRequest.of(0, 20)));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+            verify(courseRepository, never()).findById(any());
+            verify(enrollmentRepository, never()).findByCourseIdOrderByRequestedAtDesc(any(), any());
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 강의 조회 시 COURSE_NOT_FOUND 예외 발생")
+        void givenCourseNotFound_whenGetCourseEnrollments_thenThrowNotFound() {
+            when(courseRepository.findById(5L)).thenReturn(Optional.empty());
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> enrollmentService.getCourseEnrollments(CREATOR, 5L, PageRequest.of(0, 20)));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.COURSE_NOT_FOUND);
+            verify(enrollmentRepository, never()).findByCourseIdOrderByRequestedAtDesc(any(), any());
+        }
+
+        @Test
+        @DisplayName("강의 소유자가 아닌 CREATOR 요청 시 FORBIDDEN 예외 발생")
+        void givenDifferentCreator_whenGetCourseEnrollments_thenThrowForbidden() {
+            RequestUser otherCreator = new RequestUser(999L, UserRole.CREATOR);
+            Course course = buildOpenCourse(5L, 10); // creatorId = 1L != 999L
+
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(course));
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> enrollmentService.getCourseEnrollments(otherCreator, 5L, PageRequest.of(0, 20)));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
+            verify(enrollmentRepository, never()).findByCourseIdOrderByRequestedAtDesc(any(), any());
         }
     }
 }
