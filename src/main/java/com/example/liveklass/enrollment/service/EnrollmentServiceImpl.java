@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,7 @@ import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedEnrollmentResponse;
 import com.example.liveklass.enrollment.entity.Enrollment;
 import com.example.liveklass.enrollment.enums.EnrollmentStatus;
 import com.example.liveklass.enrollment.repository.EnrollmentRepository;
@@ -128,12 +131,17 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     }
 
     @Override
-    public List<EnrollmentResponse> getMyEnrollments(RequestUser requestUser) {
-        return enrollmentRepository
-                .findByStudentIdOrderByRequestedAtDesc(requestUser.userId())
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    public PagedEnrollmentResponse getMyEnrollments(RequestUser requestUser, Pageable pageable) {
+        Page<Enrollment> page = enrollmentRepository
+                .findByStudentIdOrderByRequestedAtDesc(requestUser.userId(), pageable);
+
+        return new PagedEnrollmentResponse(
+                page.getContent().stream().map(this::toResponse).toList(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast());
     }
 
     private void assertStudent(RequestUser requestUser) {

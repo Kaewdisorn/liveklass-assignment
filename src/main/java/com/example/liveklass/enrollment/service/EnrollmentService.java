@@ -1,10 +1,11 @@
 package com.example.liveklass.enrollment.service;
 
-import java.util.List;
-
 import com.example.liveklass.common.config.RequestUser;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.dto.PagedEnrollmentResponse;
+
+import org.springframework.data.domain.Pageable;
 
 public interface EnrollmentService {
 
@@ -18,5 +19,5 @@ public interface EnrollmentService {
     EnrollmentResponse cancelEnrollment(RequestUser requestUser, Long enrollmentId);
 
     // 내 수강 신청 조회
-    List<EnrollmentResponse> getMyEnrollments(RequestUser requestUser);
+    PagedEnrollmentResponse getMyEnrollments(RequestUser requestUser, Pageable pageable);
 }
