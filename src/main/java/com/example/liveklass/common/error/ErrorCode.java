@@ -11,6 +11,7 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error."),
 
     // COURSE 관련 에러
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "Course not found."),
     INVALID_STATE_TRANSITION(HttpStatus.CONFLICT, "Invalid state transition."),
 
     // ENROLLMENT 관련 에러
