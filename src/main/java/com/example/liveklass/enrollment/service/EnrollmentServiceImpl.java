@@ -34,9 +34,14 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     private static final Logger log = LoggerFactory.getLogger(EnrollmentServiceImpl.class);
 
-    private static final List<EnrollmentStatus> ACTIVE_STATUSES = List.of(
+    private static final List<EnrollmentStatus> SEAT_STATUSES = List.of(
             EnrollmentStatus.PENDING,
             EnrollmentStatus.CONFIRMED);
+
+    private static final List<EnrollmentStatus> ACTIVE_STATUSES = List.of(
+            EnrollmentStatus.PENDING,
+            EnrollmentStatus.CONFIRMED,
+            EnrollmentStatus.WAITLISTED);
 
     private final EnrollmentRepository enrollmentRepository;
     private final CourseRepository courseRepository;
@@ -72,7 +77,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             throw new BusinessException(ErrorCode.DUPLICATE_ENROLLMENT, "Active enrollment already exists.");
         }
 
-        long activeCount = enrollmentRepository.countByCourseIdAndStatusIn(course.getId(), ACTIVE_STATUSES);
+        long activeCount = enrollmentRepository.countByCourseIdAndStatusIn(course.getId(), SEAT_STATUSES);
 
         if (activeCount >= course.getCapacity()) {
             throw new BusinessException(ErrorCode.COURSE_FULL, "Course capacity has been reached.");
