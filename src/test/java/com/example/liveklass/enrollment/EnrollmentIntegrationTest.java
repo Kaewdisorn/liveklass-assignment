@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import javax.sql.DataSource;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -43,6 +45,9 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
 
     @Autowired
     EnrollmentRepository enrollmentRepository;
+
+    @Autowired
+    DataSource dataSource;
 
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -108,6 +113,24 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readValue(result.getResponse().getContentAsString(), EnrollmentResponse.class);
+    }
+
+    private EnrollmentResponse confirmViaHttp(String creatorId, Long enrollmentId) throws Exception {
+        MvcResult result = mockMvc.perform(post("/enrollments/" + enrollmentId + "/confirm")
+                .header("X-User-Id", creatorId)
+                .header("X-User-Role", CREATOR_ROLE))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readValue(result.getResponse().getContentAsString(), EnrollmentResponse.class);
+    }
+
+    private void backdateUpdatedAt(Long enrollmentId, int daysAgo) throws Exception {
+        try (var conn = dataSource.getConnection();
+                var stmt = conn.prepareStatement(
+                        "UPDATE enrollment SET updated_at = NOW() - INTERVAL '" + daysAgo + " days' WHERE id = ?")) {
+            stmt.setLong(1, enrollmentId);
+            stmt.executeUpdate();
+        }
     }
 
     // =========================
@@ -351,6 +374,50 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
 
             mockMvc.perform(post("/enrollments/" + enrollment.enrollmentId() + "/cancel"))
                     .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("CONFIRMED 신청 창 내 학생 취소 - 200")
+        void cancelEnrollment_confirmedWithinWindow_success() throws Exception {
+            Long courseId = openCourse(10);
+            EnrollmentResponse enrollment = enrollViaHttp(STUDENT1_ID, courseId);
+            confirmViaHttp(CREATOR_ID, enrollment.enrollmentId());
+
+            mockMvc.perform(post("/enrollments/" + enrollment.enrollmentId() + "/cancel")
+                    .header("X-User-Id", STUDENT1_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CANCELLED"));
+        }
+
+        @Test
+        @DisplayName("CONFIRMED 신청 창 만료 후 학생 취소 - 409 CANCELLATION_WINDOW_EXPIRED")
+        void cancelEnrollment_confirmedWindowExpired_returns409() throws Exception {
+            Long courseId = openCourse(10);
+            EnrollmentResponse enrollment = enrollViaHttp(STUDENT1_ID, courseId);
+            confirmViaHttp(CREATOR_ID, enrollment.enrollmentId());
+            backdateUpdatedAt(enrollment.enrollmentId(), 8);
+
+            mockMvc.perform(post("/enrollments/" + enrollment.enrollmentId() + "/cancel")
+                    .header("X-User-Id", STUDENT1_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("CANCELLATION_WINDOW_EXPIRED"));
+        }
+
+        @Test
+        @DisplayName("창 만료 후 CREATOR 취소 - 200 (창 제한 없음)")
+        void cancelEnrollment_expiredWindow_creatorSucceeds() throws Exception {
+            Long courseId = openCourse(10);
+            EnrollmentResponse enrollment = enrollViaHttp(STUDENT1_ID, courseId);
+            confirmViaHttp(CREATOR_ID, enrollment.enrollmentId());
+            backdateUpdatedAt(enrollment.enrollmentId(), 8);
+
+            mockMvc.perform(post("/enrollments/" + enrollment.enrollmentId() + "/cancel")
+                    .header("X-User-Id", CREATOR_ID)
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CANCELLED"));
         }
     }
 

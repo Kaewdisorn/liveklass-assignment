@@ -62,7 +62,7 @@ class EnrollmentServiceTest {
 
     @BeforeEach
     void setUp() {
-        enrollmentService = new EnrollmentServiceImpl(enrollmentRepository, courseRepository);
+        enrollmentService = new EnrollmentServiceImpl(enrollmentRepository, courseRepository, 7);
     }
 
     private Course buildOpenCourse(Long id, int capacity) {
@@ -351,6 +351,54 @@ class EnrollmentServiceTest {
                     () -> enrollmentService.cancelEnrollment(STUDENT, 100L));
 
             assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_STATE_TRANSITION);
+        }
+
+        @Test
+        @DisplayName("CONFIRMED 신청을 창 내에서 학생이 취소 → 성공")
+        void cancelEnrollment_confirmedWithinWindow_success() {
+            Enrollment enrollment = buildEnrollment(1L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            enrollment.setUpdatedAt(OffsetDateTime.now().minusDays(3));
+            when(enrollmentRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(enrollment));
+
+            EnrollmentResponse result = enrollmentService.cancelEnrollment(STUDENT, 1L);
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+        }
+
+        @Test
+        @DisplayName("CONFIRMED 신청을 창 만료 후 학생이 취소 → CANCELLATION_WINDOW_EXPIRED")
+        void cancelEnrollment_confirmedWindowExpired_throws() {
+            Enrollment enrollment = buildEnrollment(1L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            enrollment.setUpdatedAt(OffsetDateTime.now().minusDays(8));
+            when(enrollmentRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(enrollment));
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> enrollmentService.cancelEnrollment(STUDENT, 1L));
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CANCELLATION_WINDOW_EXPIRED);
+        }
+
+        @Test
+        @DisplayName("창 만료 후에도 CREATOR는 취소 가능")
+        void cancelEnrollment_expiredWindow_creatorCanStillCancel() {
+            Enrollment enrollment = buildEnrollment(1L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            enrollment.setUpdatedAt(OffsetDateTime.now().minusDays(8));
+            when(enrollmentRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(enrollment));
+
+            EnrollmentResponse result = enrollmentService.cancelEnrollment(CREATOR, 1L);
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+        }
+
+        @Test
+        @DisplayName("PENDING 신청은 창 만료 여부와 무관하게 학생이 취소 가능")
+        void cancelEnrollment_pendingAlwaysCancellable() {
+            Enrollment enrollment = buildEnrollment(1L, 5L, STUDENT.userId(), EnrollmentStatus.PENDING);
+            enrollment.setUpdatedAt(OffsetDateTime.now().minusDays(30));
+            when(enrollmentRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(enrollment));
+
+            EnrollmentResponse result = enrollmentService.cancelEnrollment(STUDENT, 1L);
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
         }
     }
 

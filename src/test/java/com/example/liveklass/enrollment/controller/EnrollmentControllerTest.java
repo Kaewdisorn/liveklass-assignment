@@ -391,6 +391,20 @@ class EnrollmentControllerTest {
 
                         verify(enrollmentService).cancelEnrollment(any(), eq(100L));
                 }
+
+                @Test
+                @DisplayName("창 만료 후 학생 취소 시 409 CANCELLATION_WINDOW_EXPIRED 반환")
+                void cancelEnrollment_windowExpired_returns409() throws Exception {
+                        when(enrollmentService.cancelEnrollment(any(RequestUser.class), eq(1L)))
+                                        .thenThrow(new BusinessException(ErrorCode.CANCELLATION_WINDOW_EXPIRED,
+                                                        "Cancellation window of 7 days has expired."));
+
+                        mockMvc.perform(post("/enrollments/1/cancel")
+                                        .header("X-User-Id", STUDENT_ID)
+                                        .header("X-User-Role", STUDENT_ROLE))
+                                        .andExpect(status().isConflict())
+                                        .andExpect(jsonPath("$.code").value("CANCELLATION_WINDOW_EXPIRED"));
+                }
         }
 
         // =========================
