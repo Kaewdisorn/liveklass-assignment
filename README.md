@@ -36,7 +36,7 @@ curl http://localhost:8080/classes
 - 수강 신청 생성 — `OPEN` 상태의 강의에 한해 `STUDENT`가 신청할 수 있습니다. 정원이 찬 경우 `WAITLISTED` 상태로 대기열에 등록됩니다. 중복 신청(활성 신청이 이미 있는 경우)은 즉시 거부됩니다.
 - 대기열 자동 승격 — `CONFIRMED` 또는 `PENDING` 신청이 취소되면, 같은 강의의 가장 오래된 `WAITLISTED` 신청이 자동으로 `PENDING`으로 승격됩니다(선착순).
 - 수강 신청 확정 — 해당 강의의 소유 `CREATOR`만 `PENDING` → `CONFIRMED`로 바꿀 수 있습니다.
-- 수강 신청 취소 — 신청자 본인 또는 해당 강의의 `CREATOR`가 취소할 수 있습니다.
+- 수강 신청 취소 — 신청자 본인 또는 해당 강의의 소유 `CREATOR`가 취소할 수 있습니다.
 - 내 신청 목록 조회 — 로그인한 사용자의 전체 신청 이력을 최신순으로 반환합니다. `page`/`size` 쿼리 파라미터로 페이지네이션을 지원합니다(기본값: `page=0`, `size=20`).
 
 ### 동시성 안전성
@@ -50,13 +50,13 @@ curl http://localhost:8080/classes
 
 - 헤더 기반 인증 — `X-User-Id` / `X-User-Role` 헤더로 사용자를 식별합니다.
 - 역할 기반 인가 — `CREATOR` / `STUDENT` 역할에 따라 API 접근을 제한합니다.
-- 소유권 검사 — 강의 상태 변경과 수강 확정은 해당 강의의 생성자만 수행할 수 있습니다.
+- 소유권 검사 — 강의 상태 변경, 수강 신청 확정, 강의별 수강생 목록 조회는 해당 강의의 생성자만 수행할 수 있고, 수강 신청 취소는 신청자 본인 또는 해당 강의의 생성자만 수행할 수 있습니다.
 
 ### 안정성 및 품질
 
 - Bean Validation + 전역 예외 처리(`GlobalExceptionHandler`)로 일관된 에러 응답을 반환합니다.
 - Flyway 마이그레이션으로 스키마를 코드로 관리합니다.
-- 단위 테스트, MockMvc 테스트, Testcontainers 통합 테스트, 동시성 테스트 150건이 모두 통과합니다.
+- 단위 테스트, MockMvc 테스트, Testcontainers 통합 테스트, 동시성 테스트 154건이 모두 통과합니다.
 
 ## 기술 스택
 
@@ -196,7 +196,7 @@ Windows PowerShell:
 
 - 통합 테스트는 Testcontainers PostgreSQL(`postgres:16`)을 사용합니다.
 - 테스트 실행을 위해 로컬 PostgreSQL을 별도로 띄울 필요는 없습니다.
-- 2026-04-27 기준 결과: 테스트 150건, 실패 0건, 에러 0건
+- 2026-04-27 기준 결과: 테스트 154건, 실패 0건, 에러 0건
 
 ## 요구사항 해석과 가정
 
@@ -219,17 +219,17 @@ Windows PowerShell:
 | `POST`  | `/classes`                        | `CREATOR` | 강의 생성                             |
 | `GET`   | `/classes`                        | 공개      | 강의 목록 조회                        |
 | `GET`   | `/classes/{courseId}`             | 공개      | 강의 상세 조회                        |
-| `PATCH` | `/classes/{courseId}/status`      | `CREATOR` | 강의 상태 변경                        |
+| `PATCH` | `/classes/{courseId}/status`      | `CREATOR` | 강의 상태 변경 (소유자 전용)          |
 | `GET`   | `/classes/{courseId}/enrollments` | `CREATOR` | 강의별 수강생 목록 조회 (소유자 전용) |
 
 ### 수강 신청 API
 
-| 메서드 | 경로                                  | 권한                       | 설명                                       |
-| ------ | ------------------------------------- | -------------------------- | ------------------------------------------ |
-| `POST` | `/enrollments`                        | `STUDENT`                  | 수강 신청 생성                             |
-| `POST` | `/enrollments/{enrollmentId}/confirm` | `CREATOR`                  | 수강 신청 확정                             |
-| `POST` | `/enrollments/{enrollmentId}/cancel`  | 신청자 본인 또는 `CREATOR` | 수강 신청 취소                             |
-| `GET`  | `/enrollments/me`                     | 인증 필요                  | 내 수강 신청 목록 조회 (`?page=0&size=20`) |
+| 메서드 | 경로                                  | 권한                                      | 설명                                       |
+| ------ | ------------------------------------- | ----------------------------------------- | ------------------------------------------ |
+| `POST` | `/enrollments`                        | `STUDENT`                                 | 수강 신청 생성                             |
+| `POST` | `/enrollments/{enrollmentId}/confirm` | `CREATOR`                                 | 수강 신청 확정                             |
+| `POST` | `/enrollments/{enrollmentId}/cancel`  | 신청자 본인 또는 해당 강의 소유 `CREATOR` | 수강 신청 취소                             |
+| `GET`  | `/enrollments/me`                     | 인증 필요                                 | 내 수강 신청 목록 조회 (`?page=0&size=20`) |
 
 ## 요청/응답 예시
 
@@ -466,7 +466,6 @@ X-User-Role: CREATOR
 | `UNAUTHORIZED`                | 401       | 인증 헤더 누락 또는 형식 오류                             |
 | `FORBIDDEN`                   | 403       | 권한 없음 (역할 불일치 또는 소유자 아님)                  |
 | `NOT_FOUND`                   | 404       | 리소스 없음                                               |
-| `COURSE_NOT_FOUND`            | 404       | 강의 없음                                                 |
 | `INVALID_STATE_TRANSITION`    | 409       | 허용되지 않은 상태 전이                                   |
 | `DUPLICATE_ENROLLMENT`        | 409       | 이미 활성 수강 신청이 존재함                              |
 | `COURSE_NOT_OPEN`             | 409       | 모집 중이 아닌 강의에 신청 시도                           |
