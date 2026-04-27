@@ -385,7 +385,7 @@ class CourseIntegrationTest extends IntegrationTestSupport {
                     .header("X-User-Id", CREATOR_ID)
                     .header("X-User-Role", CREATOR_ROLE))
                     .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.code").value("COURSE_NOT_FOUND"));
+                    .andExpect(jsonPath("$.code").value("NOT_FOUND"));
         }
 
         @Test

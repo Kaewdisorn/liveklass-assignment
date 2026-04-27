@@ -641,14 +641,14 @@ class EnrollmentServiceTest {
         }
 
         @Test
-        @DisplayName("존재하지 않는 강의 조회 시 COURSE_NOT_FOUND 예외 발생")
+        @DisplayName("존재하지 않는 강의 조회 시 NOT_FOUND 예외 발생")
         void givenCourseNotFound_whenGetCourseEnrollments_thenThrowNotFound() {
             when(courseRepository.findById(5L)).thenReturn(Optional.empty());
 
             BusinessException ex = assertThrows(BusinessException.class,
                     () -> enrollmentService.getCourseEnrollments(CREATOR, 5L, PageRequest.of(0, 20)));
 
-            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.COURSE_NOT_FOUND);
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND);
             verify(enrollmentRepository, never()).findByCourseIdOrderByRequestedAtDesc(any(), any());
         }
 

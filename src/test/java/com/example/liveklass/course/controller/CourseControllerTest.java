@@ -494,14 +494,14 @@ class CourseControllerTest {
                 @DisplayName("존재하지 않는 강의 조회 시 404 Not Found 반환")
                 void givenUnknownCourse_whenGetEnrollments_thenReturn404() throws Exception {
                         when(enrollmentService.getCourseEnrollments(any(), eq(99L), any()))
-                                        .thenThrow(new BusinessException(ErrorCode.COURSE_NOT_FOUND,
+                                        .thenThrow(new BusinessException(ErrorCode.NOT_FOUND,
                                                         "Course not found."));
 
                         mockMvc.perform(get("/classes/99/enrollments")
                                         .header("X-User-Id", USER_ID)
                                         .header("X-User-Role", USER_ROLE))
                                         .andExpect(status().isNotFound())
-                                        .andExpect(jsonPath("$.code").value(ErrorCode.COURSE_NOT_FOUND.name()));
+                                        .andExpect(jsonPath("$.code").value(ErrorCode.NOT_FOUND.name()));
 
                         verify(enrollmentService).getCourseEnrollments(any(), eq(99L), any());
                 }

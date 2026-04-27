@@ -204,7 +204,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         }
 
         Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND, "Course not found."));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
 
         if (!course.getCreatorId().equals(requestUser.userId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "Only the course creator can view enrollments.");
