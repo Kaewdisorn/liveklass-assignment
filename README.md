@@ -377,6 +377,8 @@ X-User-Role: STUDENT
 }
 ```
 
+> 409 — `CANCELLATION_WINDOW_EXPIRED`: 학생 본인이 CONFIRMED 상태의 신청을 확정 후 7일이 지나 취소 요청한 경우.
+
 ### 6. 내 수강 신청 목록 조회
 
 요청:
@@ -455,19 +457,20 @@ X-User-Role: CREATOR
 
 주요 에러 코드:
 
-| 코드                       | HTTP 상태 | 설명                                     |
-| -------------------------- | --------- | ---------------------------------------- |
-| `BAD_REQUEST`              | 400       | 입력값 오류                              |
-| `UNAUTHORIZED`             | 401       | 인증 헤더 누락 또는 형식 오류            |
-| `FORBIDDEN`                | 403       | 권한 없음 (역할 불일치 또는 소유자 아님) |
-| `NOT_FOUND`                | 404       | 리소스 없음                              |
-| `COURSE_NOT_FOUND`         | 404       | 강의 없음                                |
-| `INVALID_STATE_TRANSITION` | 409       | 허용되지 않은 상태 전이                  |
-| `DUPLICATE_ENROLLMENT`     | 409       | 이미 활성 수강 신청이 존재함             |
-| `COURSE_NOT_OPEN`          | 409       | 모집 중이 아닌 강의에 신청 시도          |
-| `COURSE_FULL`              | 409       | 정원 초과                                |
-| `LOCK_TIMEOUT`             | 409       | DB 락 대기 시간 초과, 재시도 필요        |
-| `INTERNAL_SERVER_ERROR`    | 500       | 서버 내부 오류                           |
+| 코드                          | HTTP 상태 | 설명                                                 |
+| ----------------------------- | --------- | ---------------------------------------------------- |
+| `BAD_REQUEST`                 | 400       | 입력값 오류                                          |
+| `UNAUTHORIZED`                | 401       | 인증 헤더 누락 또는 형식 오류                        |
+| `FORBIDDEN`                   | 403       | 권한 없음 (역할 불일치 또는 소유자 아님)             |
+| `NOT_FOUND`                   | 404       | 리소스 없음                                          |
+| `COURSE_NOT_FOUND`            | 404       | 강의 없음                                            |
+| `INVALID_STATE_TRANSITION`    | 409       | 허용되지 않은 상태 전이                              |
+| `DUPLICATE_ENROLLMENT`        | 409       | 이미 활성 수강 신청이 존재함                         |
+| `COURSE_NOT_OPEN`             | 409       | 모집 중이 아닌 강의에 신청 시도                      |
+| `COURSE_FULL`                 | 409       | 정원 초과                                            |
+| `CANCELLATION_WINDOW_EXPIRED` | 409       | 취소 가능 기간 만료 (학생 본인, CONFIRMED 상태 한정) |
+| `LOCK_TIMEOUT`                | 409       | DB 락 대기 시간 초과, 재시도 필요                    |
+| `INTERNAL_SERVER_ERROR`       | 500       | 서버 내부 오류                                       |
 
 ## 동시성 처리 방식
 
