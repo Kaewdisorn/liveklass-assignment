@@ -185,20 +185,127 @@ class EnrollmentServiceTest {
         }
 
         @Test
-        @DisplayName("정원 초과 시 COURSE_FULL 예외 발생")
-        void createEnrollment_courseFull_throwsCourseFull() {
+        @DisplayName("정원 초과 시 WAITLISTED 상태로 저장")
+        void createEnrollment_courseFull_savesWaitlisted() {
             Course course = buildOpenCourse(5L, 1);
+            Enrollment saved = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.WAITLISTED);
             when(courseRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(course));
             when(enrollmentRepository.existsByCourseIdAndStudentIdAndStatusIn(eq(5L), eq(STUDENT.userId()),
                     anyCollection()))
                     .thenReturn(false);
             when(enrollmentRepository.countByCourseIdAndStatusIn(eq(5L), anyCollection())).thenReturn(1L);
+            when(enrollmentRepository.saveAndFlush(any(Enrollment.class))).thenReturn(saved);
 
-            BusinessException ex = assertThrows(BusinessException.class,
-                    () -> enrollmentService.createEnrollment(STUDENT, new CreateEnrollmentRequest(5L)));
+            EnrollmentResponse result = enrollmentService.createEnrollment(STUDENT, new CreateEnrollmentRequest(5L));
 
-            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.COURSE_FULL);
-            verify(enrollmentRepository, never()).saveAndFlush(any());
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.WAITLISTED);
+            ArgumentCaptor<Enrollment> captor = ArgumentCaptor.forClass(Enrollment.class);
+            verify(enrollmentRepository).saveAndFlush(captor.capture());
+            assertThat(captor.getValue().getStatus()).isEqualTo(EnrollmentStatus.WAITLISTED);
+        }
+    }
+
+    // =========================
+    // Waitlist
+    // =========================
+    @Nested
+    @DisplayName("Waitlist")
+    class Waitlist {
+
+        @Test
+        @DisplayName("정원 초과 시 WAITLISTED 상태로 저장")
+        void createEnrollment_courseFull_returnsWaitlisted() {
+            Course course = buildOpenCourse(5L, 2);
+            Enrollment saved = buildEnrollment(101L, 5L, STUDENT.userId(), EnrollmentStatus.WAITLISTED);
+            when(courseRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(course));
+            when(enrollmentRepository.existsByCourseIdAndStudentIdAndStatusIn(eq(5L), eq(STUDENT.userId()),
+                    anyCollection()))
+                    .thenReturn(false);
+
+            when(enrollmentRepository.countByCourseIdAndStatusIn(eq(5L), anyCollection())).thenReturn(2L);
+            when(enrollmentRepository.saveAndFlush(any(Enrollment.class))).thenReturn(saved);
+
+            EnrollmentResponse result = enrollmentService.createEnrollment(STUDENT, new CreateEnrollmentRequest(5L));
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.WAITLISTED);
+        }
+
+        @Test
+        @DisplayName("정원 여유 시 PENDING 상태로 저장 (기존 동작 유지)")
+        void createEnrollment_courseNotFull_returnsPending() {
+            Course course = buildOpenCourse(5L, 10);
+            Enrollment saved = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.PENDING);
+            when(courseRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(course));
+            when(enrollmentRepository.existsByCourseIdAndStudentIdAndStatusIn(eq(5L), eq(STUDENT.userId()),
+                    anyCollection()))
+                    .thenReturn(false);
+            when(enrollmentRepository.countByCourseIdAndStatusIn(eq(5L), anyCollection())).thenReturn(0L);
+            when(enrollmentRepository.saveAndFlush(any(Enrollment.class))).thenReturn(saved);
+
+            EnrollmentResponse result = enrollmentService.createEnrollment(STUDENT, new CreateEnrollmentRequest(5L));
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("CONFIRMED 취소 시 WAITLISTED → PENDING 자동 승격")
+        void cancelEnrollment_confirmedCancelled_promotesWaitlisted() {
+            Enrollment confirmed = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            Enrollment waitlisted = buildEnrollment(200L, 5L, 20L, EnrollmentStatus.WAITLISTED);
+            when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(confirmed));
+            when(enrollmentRepository.findFirstByCourseIdAndStatusOrderByRequestedAtAsc(5L,
+                    EnrollmentStatus.WAITLISTED))
+                    .thenReturn(Optional.of(waitlisted));
+
+            EnrollmentResponse result = enrollmentService.cancelEnrollment(CREATOR, 100L);
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+            assertThat(waitlisted.getStatus()).isEqualTo(EnrollmentStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("PENDING 취소 시 WAITLISTED → PENDING 자동 승격")
+        void cancelEnrollment_pendingCancelled_promotesWaitlisted() {
+            Enrollment pending = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.PENDING);
+            Enrollment waitlisted = buildEnrollment(200L, 5L, 20L, EnrollmentStatus.WAITLISTED);
+            when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(pending));
+            when(enrollmentRepository.findFirstByCourseIdAndStatusOrderByRequestedAtAsc(5L,
+                    EnrollmentStatus.WAITLISTED))
+                    .thenReturn(Optional.of(waitlisted));
+
+            EnrollmentResponse result = enrollmentService.cancelEnrollment(STUDENT, 100L);
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+            assertThat(waitlisted.getStatus()).isEqualTo(EnrollmentStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("WAITLISTED 취소 시 자동 승격 없음")
+        void cancelEnrollment_waitlistedCancelled_noPromotion() {
+            Enrollment waitlisted = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.WAITLISTED);
+            when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(waitlisted));
+
+            EnrollmentResponse result = enrollmentService.cancelEnrollment(STUDENT, 100L);
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+            verify(enrollmentRepository, never())
+                    .findFirstByCourseIdAndStatusOrderByRequestedAtAsc(any(), any());
+        }
+
+        @Test
+        @DisplayName("WAITLISTED 없을 때 CONFIRMED 취소 시 승격 없음 (빈 Optional)")
+        void cancelEnrollment_confirmedCancelled_noWaitlist_noPromotion() {
+            Enrollment confirmed = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(confirmed));
+            when(enrollmentRepository.findFirstByCourseIdAndStatusOrderByRequestedAtAsc(5L,
+                    EnrollmentStatus.WAITLISTED))
+                    .thenReturn(Optional.empty());
+
+            EnrollmentResponse result = enrollmentService.cancelEnrollment(CREATOR, 100L);
+
+            assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+            verify(enrollmentRepository)
+                    .findFirstByCourseIdAndStatusOrderByRequestedAtAsc(5L, EnrollmentStatus.WAITLISTED);
         }
     }
 

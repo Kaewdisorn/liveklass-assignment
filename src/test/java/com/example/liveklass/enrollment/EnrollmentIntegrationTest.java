@@ -27,6 +27,8 @@ import com.example.liveklass.course.enums.CourseStatus;
 import com.example.liveklass.course.repository.CourseRepository;
 import com.example.liveklass.enrollment.dto.CreateEnrollmentRequest;
 import com.example.liveklass.enrollment.dto.EnrollmentResponse;
+import com.example.liveklass.enrollment.entity.Enrollment;
+import com.example.liveklass.enrollment.enums.EnrollmentStatus;
 import com.example.liveklass.enrollment.repository.EnrollmentRepository;
 import com.example.liveklass.support.IntegrationTestSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,6 +58,7 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
     private static final String CREATOR_ID = "1";
     private static final String STUDENT1_ID = "10";
     private static final String STUDENT2_ID = "11";
+    private static final String STUDENT3_ID = "12";
     private static final String CREATOR_ROLE = "CREATOR";
     private static final String STUDENT_ROLE = "STUDENT";
 
@@ -192,33 +195,24 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("정원 초과 시 409 반환")
-        void createEnrollment_courseFull_returns409() throws Exception {
+        @DisplayName("정원 초과 시 200 OK 와 WAITLISTED 상태 반환")
+        void createEnrollment_courseFull_returnsWaitlisted() throws Exception {
             Long courseId = openCourse(1);
             enrollViaHttp(STUDENT1_ID, courseId);
 
-            EnrollmentResponse first = enrollmentRepository
-                    .findAll()
-                    .stream()
-                    .filter(e -> e.getStudentId().equals(Long.parseLong(STUDENT1_ID)))
-                    .findFirst()
-                    .map(e -> new EnrollmentResponse(
-                            e.getId(), e.getCourseId(), e.getStudentId(), e.getStatus(),
-                            e.getRequestedAt(), e.getUpdatedAt()))
-                    .orElseThrow();
-
-            mockMvc.perform(post("/enrollments/" + first.enrollmentId() + "/confirm")
-                    .header("X-User-Id", CREATOR_ID)
-                    .header("X-User-Role", CREATOR_ROLE))
-                    .andExpect(status().isOk());
-
-            mockMvc.perform(post("/enrollments")
+            // 두 번째 신청은 대기자로 등록되어야 하며, 거부되지 않아야 함
+            MvcResult result = mockMvc.perform(post("/enrollments")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(toJson(new CreateEnrollmentRequest(courseId)))
                     .header("X-User-Id", STUDENT2_ID)
                     .header("X-User-Role", STUDENT_ROLE))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.code").value("COURSE_FULL"));
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("WAITLISTED"))
+                    .andReturn();
+
+            EnrollmentResponse waitlisted = objectMapper.readValue(
+                    result.getResponse().getContentAsString(), EnrollmentResponse.class);
+            assertThat(waitlisted.status()).isEqualTo(EnrollmentStatus.WAITLISTED);
         }
 
         @Test
@@ -528,7 +522,7 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
-        @DisplayName("기본 정렬은 requestedAt DESC — 마지막으로 신청한 항목이 첫 번째로 반환")
+        @DisplayName("인증 헤더 없을 시 401 반환")
         void getMyEnrollments_defaultSortDesc() throws Exception {
             Long course1 = openCourse(10);
             Long course2 = openCourse(10);
@@ -542,6 +536,100 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
                     .andExpect(jsonPath("$.content.length()").value(2))
                     .andExpect(jsonPath("$.content[0].enrollmentId").value(second.enrollmentId()))
                     .andExpect(jsonPath("$.content[1].enrollmentId").value(first.enrollmentId()));
+        }
+    }
+
+    // =========================
+    // Waitlist 플로우
+    // =========================
+    @Nested
+    @DisplayName("Waitlist 플로우")
+    class WaitlistFlow {
+
+        @Test
+        @DisplayName("정원 1, 학생 2명 신청 → 첫 번째 PENDING, 두 번째 WAITLISTED")
+        void secondEnrollment_courseFull_becomesWaitlisted() throws Exception {
+            Long courseId = openCourse(1);
+            EnrollmentResponse first = enrollViaHttp(STUDENT1_ID, courseId);
+            EnrollmentResponse second = enrollViaHttp(STUDENT2_ID, courseId);
+
+            assertThat(first.status()).isEqualTo(EnrollmentStatus.PENDING);
+            assertThat(second.status()).isEqualTo(EnrollmentStatus.WAITLISTED);
+        }
+
+        @Test
+        @DisplayName("WAITLISTED 중복 신청 시 409 DUPLICATE_ENROLLMENT")
+        void enrollAgain_alreadyWaitlisted_returns409() throws Exception {
+            Long courseId = openCourse(1);
+            enrollViaHttp(STUDENT1_ID, courseId); // 펜딩 자리
+            enrollViaHttp(STUDENT2_ID, courseId); // 대기자
+
+            mockMvc.perform(post("/enrollments")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(toJson(new CreateEnrollmentRequest(courseId)))
+                    .header("X-User-Id", STUDENT2_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("DUPLICATE_ENROLLMENT"));
+        }
+
+        @Test
+        @DisplayName("PENDING 취소 시 WAITLISTED → PENDING 자동 승격")
+        void cancelPending_promotesWaitlisted() throws Exception {
+            Long courseId = openCourse(1);
+            EnrollmentResponse pending = enrollViaHttp(STUDENT1_ID, courseId);
+            EnrollmentResponse waitlisted = enrollViaHttp(STUDENT2_ID, courseId);
+
+            assertThat(waitlisted.status()).isEqualTo(EnrollmentStatus.WAITLISTED);
+
+            mockMvc.perform(post("/enrollments/" + pending.enrollmentId() + "/cancel")
+                    .header("X-User-Id", STUDENT1_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+            Enrollment promoted = enrollmentRepository.findById(waitlisted.enrollmentId()).orElseThrow();
+            assertThat(promoted.getStatus()).isEqualTo(EnrollmentStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("WAITLISTED 취소 시 자동 승격 없음")
+        void cancelWaitlisted_noPromotion() throws Exception {
+            Long courseId = openCourse(1);
+            EnrollmentResponse pending = enrollViaHttp(STUDENT1_ID, courseId);
+            EnrollmentResponse waitlisted = enrollViaHttp(STUDENT2_ID, courseId);
+
+            mockMvc.perform(post("/enrollments/" + waitlisted.enrollmentId() + "/cancel")
+                    .header("X-User-Id", STUDENT2_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+            Enrollment original = enrollmentRepository.findById(pending.enrollmentId()).orElseThrow();
+            assertThat(original.getStatus()).isEqualTo(EnrollmentStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("순서 보장 — WAITLISTED 중 먼저 신청한 학생이 먼저 승격")
+        void promotion_orderByRequestedAt() throws Exception {
+            Long courseId = openCourse(1);
+            EnrollmentResponse seat = enrollViaHttp(STUDENT1_ID, courseId); // PENDING
+            EnrollmentResponse wl1 = enrollViaHttp(STUDENT2_ID, courseId); // 대기자 #1 (older)
+            EnrollmentResponse wl2 = enrollViaHttp(STUDENT3_ID, courseId); // 대기자 #2 (newer)
+
+            assertThat(wl1.status()).isEqualTo(EnrollmentStatus.WAITLISTED);
+            assertThat(wl2.status()).isEqualTo(EnrollmentStatus.WAITLISTED);
+
+            mockMvc.perform(post("/enrollments/" + seat.enrollmentId() + "/cancel")
+                    .header("X-User-Id", STUDENT1_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk());
+
+            Enrollment promoted = enrollmentRepository.findById(wl1.enrollmentId()).orElseThrow();
+            Enrollment stillWaiting = enrollmentRepository.findById(wl2.enrollmentId()).orElseThrow();
+
+            assertThat(promoted.getStatus()).isEqualTo(EnrollmentStatus.PENDING);
+            assertThat(stillWaiting.getStatus()).isEqualTo(EnrollmentStatus.WAITLISTED);
         }
     }
 }

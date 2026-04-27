@@ -196,6 +196,19 @@ class EnrollmentControllerTest {
 
                         verify(enrollmentService).createEnrollment(any(), any());
                 }
+
+                @Test
+                @DisplayName("정원 초과 시 200 OK와 status=WAITLISTED 반환")
+                void createEnrollment_courseFull_returnsWaitlisted() throws Exception {
+                        EnrollmentResponse waitlistResponse = buildEnrollmentResponse(EnrollmentStatus.WAITLISTED);
+                        when(enrollmentService.createEnrollment(any(), any())).thenReturn(waitlistResponse);
+
+                        mockMvc.perform(postWithStudentHeaders("/enrollments", new CreateEnrollmentRequest(5L)))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.status").value("WAITLISTED"));
+
+                        verify(enrollmentService).createEnrollment(any(), any());
+                }
         }
 
         // =========================

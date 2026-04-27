@@ -75,7 +75,7 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
     }
 
     @Test
-    @DisplayName("마지막 좌석 경쟁 시 한 명만 성공하고 나머지는 409를 반환한다")
+    @DisplayName("정원 1 강의에 10명 동시 신청: 전원 200 성공, 1명 PENDING 나머지 WAITLISTED")
     void lastSeatRace() throws Exception {
         int threads = 10;
         Long courseId = createOpenCourse(1).courseId();
@@ -88,17 +88,62 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
 
         List<HttpResult> results = runConcurrently(requests);
 
-        assertThat(results).filteredOn(r -> r.status() == HTTP_OK).hasSize(1);
+        // All requests succeed — no more COURSE_FULL errors with waitlist support
+        assertThat(results).allMatch(r -> r.status() == HTTP_OK);
 
-        List<HttpResult> failures = results.stream()
-                .filter(r -> r.status() == HTTP_CONFLICT)
-                .toList();
-        assertThat(failures).hasSize(threads - 1);
-        for (HttpResult failure : failures) {
-            assertThat(errorCode(failure.body())).isEqualTo("COURSE_FULL");
+        List<com.example.liveklass.enrollment.entity.Enrollment> enrolled = enrollmentRepository.findAll();
+        assertThat(enrolled).hasSize(threads);
+        assertThat(enrolled.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.PENDING).count()).isEqualTo(1);
+        assertThat(enrolled.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.WAITLISTED).count()).isEqualTo(threads - 1);
+    }
+
+    @Test
+    @DisplayName("정원 1 강의에 동시 10명 신청 → 1명 PENDING, 9명 WAITLISTED (응답 body 검증)")
+    void concurrentEnroll_oneSeats_restWaitlisted() throws Exception {
+        int threads = 10;
+        Long courseId = createOpenCourse(1).courseId();
+
+        List<Callable<HttpResult>> requests = new ArrayList<>();
+        for (int index = 0; index < threads; index++) {
+            String studentId = String.valueOf(500 + index);
+            requests.add(() -> enroll(studentId, courseId));
         }
 
-        assertThat(enrollmentRepository.count()).isEqualTo(1);
+        List<HttpResult> results = runConcurrently(requests);
+
+        // All requests succeed (no 409 COURSE_FULL)
+        assertThat(results).allMatch(r -> r.status() == HTTP_OK);
+
+        // Verify response body status values
+        long pendingInResponse = results.stream()
+                .filter(r -> {
+                    try {
+                        return "PENDING".equals(objectMapper.readTree(r.body()).path("status").asText());
+                    } catch (Exception e) {
+                        return false;
+                    }
+                }).count();
+        long waitlistedInResponse = results.stream()
+                .filter(r -> {
+                    try {
+                        return "WAITLISTED".equals(objectMapper.readTree(r.body()).path("status").asText());
+                    } catch (Exception e) {
+                        return false;
+                    }
+                }).count();
+
+        assertThat(pendingInResponse).isEqualTo(1);
+        assertThat(waitlistedInResponse).isEqualTo(threads - 1);
+
+        // Also verify DB state
+        List<com.example.liveklass.enrollment.entity.Enrollment> enrolled = enrollmentRepository.findAll();
+        assertThat(enrolled).hasSize(threads);
+        assertThat(enrolled.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.PENDING).count()).isEqualTo(1);
+        assertThat(enrolled.stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.WAITLISTED).count()).isEqualTo(threads - 1);
     }
 
     @Test
@@ -142,13 +187,24 @@ class EnrollmentConcurrencyTest extends IntegrationTestSupport {
                 () -> cancel(studentId, createdEnrollment.enrollmentId())));
 
         assertThat(results).hasSize(2);
-        assertThat(results).filteredOn(r -> r.status() == HTTP_OK).hasSize(1);
 
-        List<HttpResult> failures = results.stream()
-                .filter(r -> r.status() == HTTP_CONFLICT)
-                .toList();
-        assertThat(failures).hasSize(1);
-        assertThat(errorCode(failures.get(0).body())).isEqualTo("INVALID_STATE_TRANSITION");
+        // Both confirm-then-cancel (both 200) and cancel-then-confirm (200 + 409) are
+        // valid outcomes.
+        // Either way the final state must be deterministic — no corrupted/inconsistent
+        // state.
+        long successCount = results.stream().filter(r -> r.status() == HTTP_OK).count();
+        assertThat(successCount).isGreaterThanOrEqualTo(1);
+
+        if (successCount == 1) {
+            // Cancel ran first: confirm tried on CANCELLED enrollment →
+            // INVALID_STATE_TRANSITION
+            HttpResult failure = results.stream().filter(r -> r.status() == HTTP_CONFLICT)
+                    .findFirst().orElseThrow();
+            assertThat(errorCode(failure.body())).isEqualTo("INVALID_STATE_TRANSITION");
+        }
+        // If successCount == 2: confirm ran first (PENDING→CONFIRMED), then cancel
+        // succeeded
+        // (CONFIRMED→CANCELLED within window). Both are valid transitions.
 
         Enrollment finalEnrollment = enrollmentRepository.findById(createdEnrollment.enrollmentId()).orElseThrow();
         assertThat(finalEnrollment.getStatus()).isIn(EnrollmentStatus.CONFIRMED, EnrollmentStatus.CANCELLED);
