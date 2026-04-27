@@ -3,3 +3,7 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: none
+
+enrollment:
+  cancel:
+    window-days: 7
