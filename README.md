@@ -55,7 +55,7 @@ curl http://localhost:8080/classes
 
 - Bean Validation + 전역 예외 처리(`GlobalExceptionHandler`)로 일관된 에러 응답을 반환합니다.
 - Flyway 마이그레이션으로 스키마를 코드로 관리합니다.
-- 단위 테스트, MockMvc 테스트, Testcontainers 통합 테스트, 동시성 테스트 109건이 모두 통과합니다.
+- 단위 테스트, MockMvc 테스트, Testcontainers 통합 테스트, 동시성 테스트 137건이 모두 통과합니다.
 
 ## 기술 스택
 
@@ -194,7 +194,7 @@ Windows PowerShell:
 
 - 통합 테스트는 Testcontainers PostgreSQL(`postgres:16`)을 사용합니다.
 - 테스트 실행을 위해 로컬 PostgreSQL을 별도로 띄울 필요는 없습니다.
-- 2026-04-27 기준 결과: 테스트 123건, 실패 0건, 에러 0건
+- 2026-04-27 기준 결과: 테스트 137건, 실패 0건, 에러 0건
 
 ## 요구사항 해석과 가정
 
@@ -573,7 +573,7 @@ X-User-Role: CREATOR
 ## 미구현 또는 범위 밖 항목
 
 - 대기열(waitlist)
-- 취소 가능 기간/환불 정책
+- 환불 정책
 - 실제 인증/인가 인프라
 - 외부 결제 연동
 
@@ -583,3 +583,4 @@ X-User-Role: CREATOR
 - 락 타임아웃 발생 시 `LOCK_TIMEOUT(409)` 에러 코드를 반환합니다.
 - 강의 상태 변경과 수강 신청 확정은 해당 강의를 생성한 크리에이터 본인만 가능합니다.
 - 강의별 수강생 목록 조회(`GET /classes/{courseId}/enrollments`)는 강의 소유 CREATOR만 호출할 수 있습니다.
+- 취소 가능 기간 정책 — 학생 본인이 `CONFIRMED` 상태의 신청을 취소하려면 확정 후 7일 이내여야 합니다. `PENDING` 취소 및 크리에이터 취소는 기간 제한이 없습니다. 기간이 만료된 경우 `CANCELLATION_WINDOW_EXPIRED(409)`를 반환합니다.
