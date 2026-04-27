@@ -23,6 +23,10 @@ spring:
     init:
       mode: never
 
+enrollment:
+  cancel:
+    window-days: 7
+
 logging:
   level:
     org.hibernate.SQL: debug
