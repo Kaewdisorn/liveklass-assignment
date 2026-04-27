@@ -417,5 +417,64 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
                     .andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
         }
+
+        @Test
+        @DisplayName("3건 중 page=0&size=2 요청 시 2건, totalElements=3, totalPages=2, last=false 반환")
+        void getMyEnrollments_multiPage_firstPage() throws Exception {
+            Long courseId = openCourse(10);
+            enrollViaHttp(STUDENT1_ID, courseId);
+            enrollViaHttp(STUDENT1_ID, openCourse(10));
+            enrollViaHttp(STUDENT1_ID, openCourse(10));
+
+            mockMvc.perform(get("/enrollments/me")
+                    .param("page", "0")
+                    .param("size", "2")
+                    .header("X-User-Id", STUDENT1_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(2))
+                    .andExpect(jsonPath("$.totalElements").value(3))
+                    .andExpect(jsonPath("$.totalPages").value(2))
+                    .andExpect(jsonPath("$.last").value(false))
+                    .andExpect(jsonPath("$.page").value(0))
+                    .andExpect(jsonPath("$.size").value(2));
+        }
+
+        @Test
+        @DisplayName("3건 중 page=1&size=2 요청 시 1건, last=true 반환")
+        void getMyEnrollments_multiPage_lastPage() throws Exception {
+            Long courseId = openCourse(10);
+            enrollViaHttp(STUDENT1_ID, courseId);
+            enrollViaHttp(STUDENT1_ID, openCourse(10));
+            enrollViaHttp(STUDENT1_ID, openCourse(10));
+
+            mockMvc.perform(get("/enrollments/me")
+                    .param("page", "1")
+                    .param("size", "2")
+                    .header("X-User-Id", STUDENT1_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(1))
+                    .andExpect(jsonPath("$.totalElements").value(3))
+                    .andExpect(jsonPath("$.last").value(true))
+                    .andExpect(jsonPath("$.page").value(1));
+        }
+
+        @Test
+        @DisplayName("기본 정렬은 requestedAt DESC — 마지막으로 신청한 항목이 첫 번째로 반환")
+        void getMyEnrollments_defaultSortDesc() throws Exception {
+            Long course1 = openCourse(10);
+            Long course2 = openCourse(10);
+            EnrollmentResponse first = enrollViaHttp(STUDENT1_ID, course1);
+            EnrollmentResponse second = enrollViaHttp(STUDENT1_ID, course2);
+
+            mockMvc.perform(get("/enrollments/me")
+                    .header("X-User-Id", STUDENT1_ID)
+                    .header("X-User-Role", STUDENT_ROLE))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(2))
+                    .andExpect(jsonPath("$.content[0].enrollmentId").value(second.enrollmentId()))
+                    .andExpect(jsonPath("$.content[1].enrollmentId").value(first.enrollmentId()));
+        }
     }
 }

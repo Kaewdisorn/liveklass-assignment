@@ -456,5 +456,48 @@ class EnrollmentControllerTest {
 
                         verify(enrollmentService, never()).getMyEnrollments(any(), any());
                 }
+
+                @Test
+                @DisplayName("멀티 페이지 응답의 page/size/totalElements/totalPages/last 필드 검증")
+                void getMyEnrollments_pageMetadataIsMapped() throws Exception {
+                        List<EnrollmentResponse> items = List.of(
+                                        buildEnrollmentResponse(EnrollmentStatus.PENDING),
+                                        buildEnrollmentResponse(EnrollmentStatus.CONFIRMED));
+                        PagedEnrollmentResponse response = new PagedEnrollmentResponse(items, 0, 2, 5, 3, false);
+
+                        when(enrollmentService.getMyEnrollments(any(RequestUser.class), any(Pageable.class)))
+                                        .thenReturn(response);
+
+                        mockMvc.perform(get("/enrollments/me")
+                                        .header("X-User-Id", STUDENT_ID)
+                                        .header("X-User-Role", STUDENT_ROLE))
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.page").value(0))
+                                        .andExpect(jsonPath("$.size").value(2))
+                                        .andExpect(jsonPath("$.totalElements").value(5))
+                                        .andExpect(jsonPath("$.totalPages").value(3))
+                                        .andExpect(jsonPath("$.last").value(false))
+                                        .andExpect(jsonPath("$.content.length()").value(2));
+                }
+
+                @Test
+                @DisplayName("?page=1&size=5 파라미터가 서비스로 전달됨")
+                void getMyEnrollments_customPageParamsForwarded() throws Exception {
+                        PagedEnrollmentResponse response = new PagedEnrollmentResponse(List.of(), 1, 5, 0, 0, true);
+                        when(enrollmentService.getMyEnrollments(any(RequestUser.class), any(Pageable.class)))
+                                        .thenReturn(response);
+
+                        mockMvc.perform(get("/enrollments/me")
+                                        .param("page", "1")
+                                        .param("size", "5")
+                                        .header("X-User-Id", STUDENT_ID)
+                                        .header("X-User-Role", STUDENT_ROLE))
+                                        .andExpect(status().isOk());
+
+                        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+                        verify(enrollmentService).getMyEnrollments(any(RequestUser.class), pageableCaptor.capture());
+                        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(1);
+                        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(5);
+                }
         }
 }

@@ -402,6 +402,28 @@ class EnrollmentServiceTest {
             assertThat(result.totalElements()).isEqualTo(0);
             verify(enrollmentRepository).findByStudentIdOrderByRequestedAtDesc(STUDENT.userId(), pageable);
         }
+
+        @Test
+        @DisplayName("멀티 페이지 시나리오: page/size/totalElements/totalPages/last 필드 전부 매핑 검증")
+        void getMyEnrollments_multiPageMetadataMapped() {
+            Pageable pageable = PageRequest.of(1, 2);
+            List<Enrollment> enrollments = List.of(
+                    buildEnrollment(3L, 5L, STUDENT.userId(), EnrollmentStatus.PENDING),
+                    buildEnrollment(4L, 5L, STUDENT.userId(), EnrollmentStatus.CANCELLED));
+            Page<Enrollment> page = new PageImpl<>(enrollments, pageable, 5L);
+
+            when(enrollmentRepository.findByStudentIdOrderByRequestedAtDesc(STUDENT.userId(), pageable))
+                    .thenReturn(page);
+
+            PagedEnrollmentResponse result = enrollmentService.getMyEnrollments(STUDENT, pageable);
+
+            assertThat(result.content()).hasSize(2);
+            assertThat(result.page()).isEqualTo(1);
+            assertThat(result.size()).isEqualTo(2);
+            assertThat(result.totalElements()).isEqualTo(5L);
+            assertThat(result.totalPages()).isEqualTo(3);
+            assertThat(result.last()).isFalse();
+        }
     }
 
     // =========================

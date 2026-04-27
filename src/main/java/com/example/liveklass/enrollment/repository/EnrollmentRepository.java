@@ -1,7 +1,6 @@
 package com.example.liveklass.enrollment.repository;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -19,8 +18,6 @@ import jakarta.persistence.LockModeType;
 public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
 
     long countByCourseIdAndStatusIn(Long courseId, Collection<EnrollmentStatus> statuses);
-
-    List<Enrollment> findByStudentIdOrderByRequestedAtDesc(Long studentId);
 
     Page<Enrollment> findByStudentIdOrderByRequestedAtDesc(Long studentId, Pageable pageable);
 
