@@ -131,9 +131,15 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Enrollment not found."));
 
         boolean isOwner = enrollment.getStudentId().equals(requestUser.userId());
-        boolean isCreator = requestUser.role() == UserRole.CREATOR;
+        boolean isCourseCreator = false;
 
-        if (!isOwner && !isCreator) {
+        if (!isOwner && requestUser.role() == UserRole.CREATOR) {
+            Course course = courseRepository.findById(enrollment.getCourseId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Course not found."));
+            isCourseCreator = course.getCreatorId().equals(requestUser.userId());
+        }
+
+        if (!isOwner && !isCourseCreator) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "You cannot cancel this enrollment.");
         }
 

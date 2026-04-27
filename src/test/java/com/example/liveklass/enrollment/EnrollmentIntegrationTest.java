@@ -331,6 +331,19 @@ class EnrollmentIntegrationTest extends IntegrationTestSupport {
         }
 
         @Test
+        @DisplayName("다른 크리에이터가 취소 요청 시 403 반환")
+        void cancelEnrollment_byDifferentCreator_returns403() throws Exception {
+            Long courseId = openCourse(10);
+            EnrollmentResponse enrollment = enrollViaHttp(STUDENT1_ID, courseId);
+
+            mockMvc.perform(post("/enrollments/" + enrollment.enrollmentId() + "/cancel")
+                    .header("X-User-Id", "999")
+                    .header("X-User-Role", CREATOR_ROLE))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        }
+
+        @Test
         @DisplayName("다른 학생이 취소 요청 시 403 반환")
         void cancelEnrollment_byOtherStudent_returns403() throws Exception {
             Long courseId = openCourse(10);

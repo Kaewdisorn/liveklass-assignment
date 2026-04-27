@@ -58,6 +58,7 @@ class EnrollmentServiceTest {
 
     private static final RequestUser STUDENT = new RequestUser(10L, UserRole.STUDENT);
     private static final RequestUser CREATOR = new RequestUser(1L, UserRole.CREATOR);
+    private static final RequestUser OTHER_CREATOR = new RequestUser(999L, UserRole.CREATOR);
     private static final RequestUser OTHER_STUDENT = new RequestUser(99L, UserRole.STUDENT);
 
     @BeforeEach
@@ -253,6 +254,7 @@ class EnrollmentServiceTest {
             Enrollment confirmed = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
             Enrollment waitlisted = buildEnrollment(200L, 5L, 20L, EnrollmentStatus.WAITLISTED);
             when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(confirmed));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(buildOpenCourse(5L, 10)));
             when(enrollmentRepository.findFirstByCourseIdAndStatusOrderByRequestedAtAsc(5L,
                     EnrollmentStatus.WAITLISTED))
                     .thenReturn(Optional.of(waitlisted));
@@ -297,6 +299,7 @@ class EnrollmentServiceTest {
         void cancelEnrollment_confirmedCancelled_noWaitlist_noPromotion() {
             Enrollment confirmed = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
             when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(confirmed));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(buildOpenCourse(5L, 10)));
             when(enrollmentRepository.findFirstByCourseIdAndStatusOrderByRequestedAtAsc(5L,
                     EnrollmentStatus.WAITLISTED))
                     .thenReturn(Optional.empty());
@@ -419,10 +422,24 @@ class EnrollmentServiceTest {
         void cancelEnrollment_byCreator_success() {
             Enrollment enrollment = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
             when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(enrollment));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(buildOpenCourse(5L, 10)));
 
             EnrollmentResponse result = enrollmentService.cancelEnrollment(CREATOR, 100L);
 
             assertThat(result.status()).isEqualTo(EnrollmentStatus.CANCELLED);
+        }
+
+        @Test
+        @DisplayName("다른 크리에이터가 취소 시도 시 FORBIDDEN 예외 발생")
+        void cancelEnrollment_byOtherCreator_throwsForbidden() {
+            Enrollment enrollment = buildEnrollment(100L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
+            when(enrollmentRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(enrollment));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(buildOpenCourse(5L, 10)));
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> enrollmentService.cancelEnrollment(OTHER_CREATOR, 100L));
+
+            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN);
         }
 
         @Test
@@ -490,6 +507,7 @@ class EnrollmentServiceTest {
             Enrollment enrollment = buildEnrollment(1L, 5L, STUDENT.userId(), EnrollmentStatus.CONFIRMED);
             enrollment.setUpdatedAt(OffsetDateTime.now().minusDays(8));
             when(enrollmentRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(enrollment));
+            when(courseRepository.findById(5L)).thenReturn(Optional.of(buildOpenCourse(5L, 10)));
 
             EnrollmentResponse result = enrollmentService.cancelEnrollment(CREATOR, 1L);
 
