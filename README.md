@@ -2,7 +2,7 @@
 
 Spring Boot와 PostgreSQL로 구현한 Liveklass BE-A 과제용 수강 신청 시스템입니다.
 
-강의 생성/조회/상태 변경, 수강 신청 생성/확정/취소/내역 조회가 구현되어 있습니다. 스키마는 Flyway로 관리하고, 수강 신청 관련 동시성은 비관적 락과 데이터베이스 제약으로 보호합니다. 테스트는 단위 테스트, MVC 테스트, 통합 테스트, 동시성 테스트까지 포함합니다.
+강의 생성/조회/상태 변경, 수강 신청 생성/확정/취소/내역 조회가 구현되어 있습니다. 정원이 찬 강의에 신청하면 자동으로 대기열(waitlist)에 등록되고, 선행 신청이 취소될 때 가장 오래된 대기자가 자동으로 `PENDING`으로 승격됩니다. 스키마는 Flyway로 관리하고, 수강 신청 관련 동시성은 비관적 락과 데이터베이스 제약으로 보호합니다. 테스트는 단위 테스트, MVC 테스트, 통합 테스트, 동시성 테스트까지 포함합니다.
 
 ## 빠른 시작
 
@@ -33,16 +33,17 @@ curl http://localhost:8080/classes
 
 ### 수강 신청 관리
 
-- 수강 신청 생성 — `OPEN` 상태의 강의에 한해 `STUDENT`가 신청할 수 있습니다. 정원 초과·중복 신청은 즉시 거부됩니다.
+- 수강 신청 생성 — `OPEN` 상태의 강의에 한해 `STUDENT`가 신청할 수 있습니다. 정원이 찬 경우 `WAITLISTED` 상태로 대기열에 등록됩니다. 중복 신청(활성 신청이 이미 있는 경우)은 즉시 거부됩니다.
+- 대기열 자동 승격 — `CONFIRMED` 또는 `PENDING` 신청이 취소되면, 같은 강의의 가장 오래된 `WAITLISTED` 신청이 자동으로 `PENDING`으로 승격됩니다(선착순).
 - 수강 신청 확정 — 해당 강의의 소유 `CREATOR`만 `PENDING` → `CONFIRMED`로 바꿀 수 있습니다.
 - 수강 신청 취소 — 신청자 본인 또는 해당 강의의 `CREATOR`가 취소할 수 있습니다.
 - 내 신청 목록 조회 — 로그인한 사용자의 전체 신청 이력을 최신순으로 반환합니다. `page`/`size` 쿼리 파라미터로 페이지네이션을 지원합니다(기본값: `page=0`, `size=20`).
 
 ### 동시성 안전성
 
-- 수강 신청 생성 시 강의 row에 `PESSIMISTIC_WRITE` 락을 걸어 정원 초과를 방지합니다.
+- 수강 신청 생성 시 강의 row에 `PESSIMISTIC_WRITE` 락을 걸어 정원 초과와 waitlist 등록을 직렬화합니다.
 - 확정/취소 시 enrollment row에 `PESSIMISTIC_WRITE` 락을 걸어 상태 충돌을 방지합니다.
-- DB 부분 유니크 인덱스로 중복 활성 신청을 추가 차단합니다.
+- DB 부분 유니크 인덱스로 중복 활성 신청(`PENDING`/`CONFIRMED`/`WAITLISTED`)을 추가 차단합니다.
 - 락 대기 시간 초과 시 `LOCK_TIMEOUT(409)` 에러를 반환합니다.
 
 ### 보안 및 권한
@@ -55,7 +56,7 @@ curl http://localhost:8080/classes
 
 - Bean Validation + 전역 예외 처리(`GlobalExceptionHandler`)로 일관된 에러 응답을 반환합니다.
 - Flyway 마이그레이션으로 스키마를 코드로 관리합니다.
-- 단위 테스트, MockMvc 테스트, Testcontainers 통합 테스트, 동시성 테스트 137건이 모두 통과합니다.
+- 단위 테스트, MockMvc 테스트, Testcontainers 통합 테스트, 동시성 테스트 150건이 모두 통과합니다.
 
 ## 기술 스택
 
@@ -110,13 +111,14 @@ src/main/java/com/example/liveklass/
     ├── controller/EnrollmentController.java
     ├── dto/                          # CreateEnrollmentRequest, EnrollmentResponse, PagedEnrollmentResponse
     ├── entity/Enrollment.java
-    ├── enums/EnrollmentStatus.java   # PENDING / CONFIRMED / CANCELLED
+    ├── enums/EnrollmentStatus.java   # PENDING / CONFIRMED / CANCELLED / WAITLISTED
     ├── repository/EnrollmentRepository.java
     └── service/EnrollmentService.java + EnrollmentServiceImpl.java
 
 src/main/resources/
 ├── application.yml
-└── db/migration/V1__initial.sql     # Flyway 초기 스키마
+├── db/migration/V1__initial.sql     # Flyway 초기 스키마
+└── db/migration/V2__waitlist.sql    # WAITLISTED 상태 + 부분 유니크 인덱스 확장
 ```
 
 ## 인증/인가 방식
@@ -194,7 +196,7 @@ Windows PowerShell:
 
 - 통합 테스트는 Testcontainers PostgreSQL(`postgres:16`)을 사용합니다.
 - 테스트 실행을 위해 로컬 PostgreSQL을 별도로 띄울 필요는 없습니다.
-- 2026-04-27 기준 결과: 테스트 137건, 실패 0건, 에러 0건
+- 2026-04-27 기준 결과: 테스트 150건, 실패 0건, 에러 0건
 
 ## 요구사항 해석과 가정
 
@@ -203,7 +205,8 @@ Windows PowerShell:
 - 수강 신청 생성은 `STUDENT`만 수행할 수 있습니다.
 - 수강 확정은 외부 결제 연동 없이 내부 상태 변경으로 단순화했습니다.
 - `PENDING`과 `CONFIRMED`는 모두 좌석을 점유하는 활성 상태로 봅니다.
-- 같은 학생은 같은 강의에 대해 `PENDING` 또는 `CONFIRMED` 상태의 신청을 하나만 가질 수 있습니다.
+- `WAITLISTED`는 좌석은 점유하지 않지만, 활성 신청으로 취급하여 중복 신청을 방지합니다.
+- 같은 학생은 같은 강의에 대해 `PENDING`, `CONFIRMED`, `WAITLISTED` 상태의 신청을 하나만 가질 수 있습니다.
 - 강의 상태 전이는 `DRAFT -> OPEN -> CLOSED`만 허용합니다.
 - 강의 상태 변경과 수강 신청 확정은 해당 강의를 직접 생성한 `CREATOR`만 수행할 수 있습니다.
 
@@ -457,20 +460,20 @@ X-User-Role: CREATOR
 
 주요 에러 코드:
 
-| 코드                          | HTTP 상태 | 설명                                                 |
-| ----------------------------- | --------- | ---------------------------------------------------- |
-| `BAD_REQUEST`                 | 400       | 입력값 오류                                          |
-| `UNAUTHORIZED`                | 401       | 인증 헤더 누락 또는 형식 오류                        |
-| `FORBIDDEN`                   | 403       | 권한 없음 (역할 불일치 또는 소유자 아님)             |
-| `NOT_FOUND`                   | 404       | 리소스 없음                                          |
-| `COURSE_NOT_FOUND`            | 404       | 강의 없음                                            |
-| `INVALID_STATE_TRANSITION`    | 409       | 허용되지 않은 상태 전이                              |
-| `DUPLICATE_ENROLLMENT`        | 409       | 이미 활성 수강 신청이 존재함                         |
-| `COURSE_NOT_OPEN`             | 409       | 모집 중이 아닌 강의에 신청 시도                      |
-| `COURSE_FULL`                 | 409       | 정원 초과                                            |
-| `CANCELLATION_WINDOW_EXPIRED` | 409       | 취소 가능 기간 만료 (학생 본인, CONFIRMED 상태 한정) |
-| `LOCK_TIMEOUT`                | 409       | DB 락 대기 시간 초과, 재시도 필요                    |
-| `INTERNAL_SERVER_ERROR`       | 500       | 서버 내부 오류                                       |
+| 코드                          | HTTP 상태 | 설명                                                      |
+| ----------------------------- | --------- | --------------------------------------------------------- |
+| `BAD_REQUEST`                 | 400       | 입력값 오류                                               |
+| `UNAUTHORIZED`                | 401       | 인증 헤더 누락 또는 형식 오류                             |
+| `FORBIDDEN`                   | 403       | 권한 없음 (역할 불일치 또는 소유자 아님)                  |
+| `NOT_FOUND`                   | 404       | 리소스 없음                                               |
+| `COURSE_NOT_FOUND`            | 404       | 강의 없음                                                 |
+| `INVALID_STATE_TRANSITION`    | 409       | 허용되지 않은 상태 전이                                   |
+| `DUPLICATE_ENROLLMENT`        | 409       | 이미 활성 수강 신청이 존재함                              |
+| `COURSE_NOT_OPEN`             | 409       | 모집 중이 아닌 강의에 신청 시도                           |
+| `COURSE_FULL`                 | 409       | 정원 초과 (현재는 대기열 등록으로 대체되어 발생하지 않음) |
+| `CANCELLATION_WINDOW_EXPIRED` | 409       | 취소 가능 기간 만료 (학생 본인, CONFIRMED 상태 한정)      |
+| `LOCK_TIMEOUT`                | 409       | DB 락 대기 시간 초과, 재시도 필요                         |
+| `INTERNAL_SERVER_ERROR`       | 500       | 서버 내부 오류                                            |
 
 ## 동시성 처리 방식
 
@@ -479,9 +482,14 @@ X-User-Role: CREATOR
 ### 수강 신청 생성
 
 - 대상 강의를 `PESSIMISTIC_WRITE`로 잠급니다.
-- 락 획득 후 강의 상태, 중복 활성 신청 여부, 현재 좌석 수를 다시 확인합니다.
-- 같은 트랜잭션 안에서 `PENDING` 상태의 신청을 저장합니다.
-- DB에는 `(course_id, student_id)`에 대한 부분 유니크 인덱스를 두고, `PENDING`/`CONFIRMED` 중복을 막습니다.
+- 락 획득 후 강의 상태, 중복 활성 신청 여부(`PENDING`/`CONFIRMED`/`WAITLISTED`)를 다시 확인합니다.
+- 좌석이 남아 있으면 `PENDING`으로 저장하고, 정원이 차 있으면 `WAITLISTED`로 저장합니다.
+- DB에는 `(course_id, student_id)`에 대한 부분 유니크 인덱스를 두고, `PENDING`/`CONFIRMED`/`WAITLISTED` 중복을 막습니다.
+
+### 대기열 자동 승격
+
+- `cancelEnrollment` 트랜잭션 안에서, 취소 대상의 원래 상태가 `PENDING` 또는 `CONFIRMED`인 경우에 한해 해당 강의의 `WAITLISTED` 신청 중 `requested_at`이 가장 이른 건을 `PENDING`으로 승격합니다.
+- `WAITLISTED` 신청 취소 시에는 승격을 수행하지 않습니다.
 
 ### 수강 신청 확정/취소
 
@@ -494,11 +502,11 @@ X-User-Role: CREATOR
 
 ### 테스트로 검증한 경쟁 상황
 
-| 시나리오               | 설정                   | 성공     | 실패 응답                        |
-| ---------------------- | ---------------------- | -------- | -------------------------------- |
-| 마지막 좌석 경쟁       | 정원 1, 동시 10명 신청 | 1명 성공 | `COURSE_FULL (409)`              |
-| 같은 학생 중복 요청    | 동시 5건 신청          | 1건 성공 | `DUPLICATE_ENROLLMENT (409)`     |
-| 확정 vs 취소 동시 요청 | 동시 2건               | 1건 성공 | `INVALID_STATE_TRANSITION (409)` |
+| 시나리오               | 설정                   | 성공                                      | 실패 응답                        |
+| ---------------------- | ---------------------- | ----------------------------------------- | -------------------------------- |
+| 마지막 좌석 경쟁       | 정원 1, 동시 10명 신청 | 전원 200 OK (1명 PENDING, 9명 WAITLISTED) | —                                |
+| 같은 학생 중복 요청    | 동시 5건 신청          | 1건 성공                                  | `DUPLICATE_ENROLLMENT (409)`     |
+| 확정 vs 취소 동시 요청 | 동시 2건               | 1건 성공                                  | `INVALID_STATE_TRANSITION (409)` |
 
 ## 데이터 모델
 
@@ -519,14 +527,14 @@ X-User-Role: CREATOR
 - `id`: PK
 - `course_id`: 강의 FK
 - `student_id`: 학생 ID
-- `status`: `PENDING`, `CONFIRMED`, `CANCELLED`
+- `status`: `PENDING`, `CONFIRMED`, `CANCELLED`, `WAITLISTED`
 - `requested_at`, `updated_at`: 생성/수정 시각
 
 ### 인덱스와 제약
 
 - `enrollment(course_id, status)` 인덱스
 - `enrollment(student_id, requested_at desc)` 인덱스
-- 활성 신청 1건만 허용하는 부분 유니크 인덱스
+- 활성 신청 1건만 허용하는 부분 유니크 인덱스 (`PENDING`/`CONFIRMED`/`WAITLISTED` 상태 대상)
 - 가격, 정원, 날짜 범위, enum 값에 대한 DB 체크 제약
 
 ## 설계 결정
@@ -572,13 +580,13 @@ X-User-Role: CREATOR
 
 ## 미구현 또는 범위 밖 항목
 
-- 대기열(waitlist)
 - 환불 정책
 - 실제 인증/인가 인프라
 - 외부 결제 연동
 
 ## 구현 상태 요약
 
+- 대기열(waitlist) 지원 — 정원 초과 시 `WAITLISTED`로 등록하고, `PENDING`/`CONFIRMED` 취소 시 가장 오래된 `WAITLISTED`를 자동으로 `PENDING`으로 승격합니다.
 - 동시성 테스트는 성공/실패 HTTP 상태, 정확한 에러 코드, 최종 DB 상태를 모두 검증합니다.
 - 락 타임아웃 발생 시 `LOCK_TIMEOUT(409)` 에러 코드를 반환합니다.
 - 강의 상태 변경과 수강 신청 확정은 해당 강의를 생성한 크리에이터 본인만 가능합니다.
