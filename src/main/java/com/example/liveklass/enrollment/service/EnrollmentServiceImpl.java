@@ -6,8 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
 
 import com.example.liveklass.common.config.RequestUser;
 import com.example.liveklass.common.config.UserRole;
@@ -37,10 +40,15 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
     private final EnrollmentRepository enrollmentRepository;
     private final CourseRepository courseRepository;
+    private final int cancelWindowDays;
 
-    public EnrollmentServiceImpl(EnrollmentRepository enrollmentRepository, CourseRepository courseRepository) {
+    public EnrollmentServiceImpl(
+            EnrollmentRepository enrollmentRepository,
+            CourseRepository courseRepository,
+            @Value("${enrollment.cancel.window-days:7}") int cancelWindowDays) {
         this.enrollmentRepository = enrollmentRepository;
         this.courseRepository = courseRepository;
+        this.cancelWindowDays = cancelWindowDays;
     }
 
     @Override
@@ -125,6 +133,18 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             throw new BusinessException(
                     ErrorCode.INVALID_STATE_TRANSITION,
                     "Enrollment is already cancelled.");
+        }
+
+        // 취소 가능 상태 체크 - 학생 본인의 CONFIRMED 신청에만 적용됩니다.
+        // CONFIRMED 상태 아닌 경우 취소 가능 기간 체크를 하지 않습니다.
+        // Creator가 취소하는 경우에도 기간 체크를 하지 않습니다.
+        if (isOwner && enrollment.getStatus() == EnrollmentStatus.CONFIRMED) {
+            OffsetDateTime deadline = enrollment.getUpdatedAt().plusDays(cancelWindowDays);
+            if (OffsetDateTime.now().isAfter(deadline)) {
+                throw new BusinessException(
+                        ErrorCode.CANCELLATION_WINDOW_EXPIRED,
+                        "Cancellation window of " + cancelWindowDays + " days has expired.");
+            }
         }
 
         enrollment.setStatus(EnrollmentStatus.CANCELLED);
