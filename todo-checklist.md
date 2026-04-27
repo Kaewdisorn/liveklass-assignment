@@ -18,7 +18,7 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] README has been updated to match the current implementation
 - [ ] Concurrency tests still assert generic `409` outcomes rather than exact losing error codes
 - [ ] Lock-timeout-specific exception mapping is still missing
-- [ ] Ownership semantics are still role-based only; verify whether stricter creator ownership is expected
+- [x] Ownership semantics decided: Option B (creator ownership check) will be applied to the new per-course enrollment list endpoint
 
 ## 1. Project setup
 
@@ -98,6 +98,22 @@ Main goal: complete the required APIs, make enrollment concurrency safe, and lea
 - [x] Ensure only one state transition can succeed per enrollment under concurrent requests
 - [x] Convert unique-constraint violations to `DUPLICATE_ENROLLMENT`
 - [x] Treat the service-level duplicate check as a fast-fail optimization; the database is the final source of truth
+
+## 6. POST MVP — Per-course enrolled-student list for creators
+
+See full plan in `.vscode/tasks-v5.md`.
+
+- [ ] Add `COURSE_NOT_FOUND` error code to `ErrorCode.java`
+- [ ] Add `findByCourseIdOrderByRequestedAtDesc` query to `EnrollmentRepository`
+- [ ] Create `CourseEnrollmentResponse` DTO
+- [ ] Create `PagedCourseEnrollmentResponse` DTO
+- [ ] Add `getCourseEnrollments` method to `EnrollmentService` interface
+- [ ] Implement `getCourseEnrollments` in `EnrollmentServiceImpl` with role + ownership guards
+- [ ] Add `GET /classes/{courseId}/enrollments` endpoint to `CourseController`
+- [ ] Unit tests for controller (`GetCourseEnrollments` nested class, 4 cases)
+- [ ] Unit tests for service (`GetCourseEnrollments` nested class, 4 cases)
+- [ ] Integration test: full round-trip (4 scenarios: happy path, wrong owner, student, unknown course)
+- [ ] Re-run full test suite; confirm 0 failures
 - [ ] Map lock-timeout or lock-acquisition failures to a stable API error instead of relying on generic fallback handling
 
 ## 6. Error handling

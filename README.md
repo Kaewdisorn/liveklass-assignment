@@ -211,13 +211,13 @@ Windows PowerShell:
 
 ### 강의 API
 
-| 메서드  | 경로                                    | 권한      | 설명                           |
-| ------- | --------------------------------------- | --------- | ------------------------------ |
-| `POST`  | `/classes`                              | `CREATOR` | 강의 생성                      |
-| `GET`   | `/classes`                              | 공개      | 강의 목록 조회                 |
-| `GET`   | `/classes/{courseId}`                   | 공개      | 강의 상세 조회                 |
-| `PATCH` | `/classes/{courseId}/status`            | `CREATOR` | 강의 상태 변경                 |
-| `GET`   | `/classes/{courseId}/enrollments`       | `CREATOR` | 강의별 수강생 목록 조회 (소유자 전용) |
+| 메서드  | 경로                              | 권한      | 설명                                  |
+| ------- | --------------------------------- | --------- | ------------------------------------- |
+| `POST`  | `/classes`                        | `CREATOR` | 강의 생성                             |
+| `GET`   | `/classes`                        | 공개      | 강의 목록 조회                        |
+| `GET`   | `/classes/{courseId}`             | 공개      | 강의 상세 조회                        |
+| `PATCH` | `/classes/{courseId}/status`      | `CREATOR` | 강의 상태 변경                        |
+| `GET`   | `/classes/{courseId}/enrollments` | `CREATOR` | 강의별 수강생 목록 조회 (소유자 전용) |
 
 ### 수강 신청 API
 
