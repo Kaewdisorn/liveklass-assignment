@@ -79,14 +79,17 @@ public class EnrollmentServiceImpl implements EnrollmentService {
 
         long activeCount = enrollmentRepository.countByCourseIdAndStatusIn(course.getId(), SEAT_STATUSES);
 
+        EnrollmentStatus initialStatus;
         if (activeCount >= course.getCapacity()) {
-            throw new BusinessException(ErrorCode.COURSE_FULL, "Course capacity has been reached.");
+            initialStatus = EnrollmentStatus.WAITLISTED;
+        } else {
+            initialStatus = EnrollmentStatus.PENDING;
         }
 
         Enrollment enrollment = new Enrollment();
         enrollment.setCourseId(course.getId());
         enrollment.setStudentId(requestUser.userId());
-        enrollment.setStatus(EnrollmentStatus.PENDING);
+        enrollment.setStatus(initialStatus);
 
         Enrollment saved = enrollmentRepository.saveAndFlush(enrollment);
         log.info("Enrollment created: enrollmentId={}, courseId={}, studentId={}",
@@ -152,8 +155,24 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             }
         }
 
+        // 상태 변경 전에 원래 상태를 확인하기 위한 변수
+        EnrollmentStatus originalStatus = enrollment.getStatus();
+
         enrollment.setStatus(EnrollmentStatus.CANCELLED);
         log.info("Enrollment cancelled: enrollmentId={} by userId={}", enrollmentId, requestUser.userId());
+
+        // 대기자 명단에서 가장 오래된 신청을 찾아서 PENDING으로 변경
+        if (originalStatus == EnrollmentStatus.PENDING || originalStatus == EnrollmentStatus.CONFIRMED) {
+            enrollmentRepository
+                    .findFirstByCourseIdAndStatusOrderByRequestedAtAsc(
+                            enrollment.getCourseId(), EnrollmentStatus.WAITLISTED)
+                    .ifPresent(waitlisted -> {
+                        waitlisted.setStatus(EnrollmentStatus.PENDING);
+                        log.info("Waitlist promoted: enrollmentId={} courseId={}",
+                                waitlisted.getId(), waitlisted.getCourseId());
+                    });
+        }
+
         return toResponse(enrollment);
     }
 

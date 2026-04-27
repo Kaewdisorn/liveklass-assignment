@@ -31,4 +31,8 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Long> {
     Optional<Enrollment> findByIdForUpdate(@Param("enrollmentId") Long enrollmentId);
 
     Page<Enrollment> findByCourseIdOrderByRequestedAtDesc(Long courseId, Pageable pageable);
+
+    // 대기 상태인 첫 번째 신청을 찾는 메서드
+    Optional<Enrollment> findFirstByCourseIdAndStatusOrderByRequestedAtAsc(
+            Long courseId, EnrollmentStatus status);
 }
